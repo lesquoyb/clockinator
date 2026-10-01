@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "mobile-android-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/mobile-android-design/SKILL.md",
+      "computedHash": "143a60d6a0744a5058adf984e3a64b75cd2ef3714a15557f4ff6fd95e39ff23a"
+    },
+    "mobile-design": {
+      "source": "RubenGlez/mobile-design",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "6fd8eb2016eb087a236c6417f5876fd5de5785f30c53408fb8562cc86fe93e41"
+    },
+    "mobile-design-review": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-design-review/SKILL.md",
+      "computedHash": "833b0192dba980732a5a8e7933fb36fc123a330b60fdd1eb2bd215c1ef7861c4"
+    },
+    "mobile-design-system": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-design-system/SKILL.md",
+      "computedHash": "75039907839edb5446144cdf8b10913e78f2c8898da3a9dfad748ff484729960"
+    },
+    "mobile-nav-plan": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-nav-plan/SKILL.md",
+      "computedHash": "bef2814d1e071ccfe57e4ec2580767d9e6b5fb50d580325fd47185f0007f39b4"
+    },
+    "mobile-redesign-app": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-redesign-app/SKILL.md",
+      "computedHash": "7a3f64c02f5644e95cc822473032cc8ba88300ec741fb356730290af4446a2c1"
+    },
+    "mobile-redesign-screen": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-redesign-screen/SKILL.md",
+      "computedHash": "c6e574a7607bed8fb7909f0345b497b2e5acbdc1aafc776930942e61e59ba46b"
+    },
+    "mobile-taste": {
+      "source": "draftbit/mobile-taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-taste/SKILL.md",
+      "computedHash": "ef44362f66b5736408c70f63c6ccdb1d2845bc15e458e0bc0cb9d03d990dd798"
+    }
+  }
+}
