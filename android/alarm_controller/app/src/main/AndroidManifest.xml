@@ -39,6 +39,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
     <!-- NFC Permissions (optional hardware feature) -->
     <uses-permission android:name="android.permission.NFC" />
@@ -78,7 +79,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Alarm Broadcast Receiver -->
         <receiver
             android:name=".alarm.AlarmReceiver"
             android:exported="false">
@@ -101,6 +101,13 @@
             android:name=".alarm.AlarmRingtoneService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Foreground Service that keeps the BLE autoConnect watch alive
+             when the app is not in the foreground. -->
+        <service
+            android:name=".communication.ble.BleAutoConnectService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
     </application>
 

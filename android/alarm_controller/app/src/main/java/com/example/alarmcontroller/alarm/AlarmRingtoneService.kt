@@ -17,38 +17,54 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.alarmcontroller.alarm.RingtoneType
 import com.example.alarmcontroller.MainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/**
+ * Foreground service that plays the alarm ringtone and vibrates the device.
+ * Exposes static StateFlow values so the ViewModel and NFC handler can observe
+ * the ringing state without holding a reference to the service.
+ */
 class AlarmRingtoneService : Service() {
 
     companion object {
-        private const val TAG = "AlarmRingtoneService"
-        private const val CHANNEL_ID = "alarm_ringtone_channel"
+        private const val TAG             = "AlarmRingtoneService"
+        private const val CHANNEL_ID      = "alarm_ringtone_channel"
         private const val NOTIFICATION_ID = 4242
 
-        const val ACTION_START = "ACTION_START_ALARM"
-        const val ACTION_STOP = "ACTION_STOP_ALARM"
+        const val ACTION_START  = "ACTION_START_ALARM"
+        const val ACTION_STOP   = "ACTION_STOP_ALARM"
         const val ACTION_SNOOZE = "ACTION_SNOOZE_ALARM"
 
-        const val EXTRA_TITLE = "extra_title"
-        const val EXTRA_ID = "extra_id"
+        const val EXTRA_TITLE        = "extra_title"
+        const val EXTRA_ID           = "extra_id"
+        const val EXTRA_RINGTONE_TYPE = "extra_ringtone_type"
 
         private val _isRinging = MutableStateFlow(false)
+        /** True while the alarm ringtone is playing. */
         val isRinging: StateFlow<Boolean> = _isRinging.asStateFlow()
 
         private val _ringingAlarmTitle = MutableStateFlow<String?>(null)
+        /** Title of the currently ringing alarm, or null. */
         val ringingAlarmTitle: StateFlow<String?> = _ringingAlarmTitle.asStateFlow()
 
-        private var activeAlarmId: String? = null
+        /** ID of the alarm currently ringing; read by the ViewModel for snooze-duration lookup. */
+        var activeAlarmId: String? = null
+            private set
 
-        fun startAlarm(context: Context, alarmId: String, title: String) {
+        /** Ringtone slot currently ringing. */
+        var activeRingtoneType: RingtoneType? = null
+            private set
+
+        fun startAlarm(context: Context, alarmId: String, title: String, ringtone: RingtoneType) {
             val intent = Intent(context, AlarmRingtoneService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_ID, alarmId)
                 putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_RINGTONE_TYPE, ringtone.wire)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -58,18 +74,18 @@ class AlarmRingtoneService : Service() {
         }
 
         fun stopAlarm(context: Context) {
-            val intent = Intent(context, AlarmRingtoneService::class.java).apply {
-                action = ACTION_STOP
-            }
-            context.startService(intent)
+            context.startService(
+                Intent(context, AlarmRingtoneService::class.java).apply { action = ACTION_STOP }
+            )
         }
 
         fun snoozeAlarm(context: Context, delayMinutes: Int = 10) {
-            val intent = Intent(context, AlarmRingtoneService::class.java).apply {
-                action = ACTION_SNOOZE
-                putExtra("delay_minutes", delayMinutes)
-            }
-            context.startService(intent)
+            context.startService(
+                Intent(context, AlarmRingtoneService::class.java).apply {
+                    action = ACTION_SNOOZE
+                    putExtra("delay_minutes", delayMinutes)
+                }
+            )
         }
     }
 
@@ -81,10 +97,8 @@ class AlarmRingtoneService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vibratorManager?.defaultVibrator
+            (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
             getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
@@ -94,37 +108,34 @@ class AlarmRingtoneService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val alarmId = intent.getStringExtra(EXTRA_ID) ?: "default"
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Alarme"
-                activeAlarmId = alarmId
+                val alarmId  = intent.getStringExtra(EXTRA_ID) ?: "default"
+                val title    = intent.getStringExtra(EXTRA_TITLE) ?: "Alarm"
+                val typeWire = intent.getStringExtra(EXTRA_RINGTONE_TYPE) ?: RingtoneType.WAKEUP.wire
+                activeAlarmId         = alarmId
+                activeRingtoneType    = RingtoneType.fromWire(typeWire) ?: RingtoneType.WAKEUP
                 _ringingAlarmTitle.value = title
-                _isRinging.value = true
-
+                _isRinging.value         = true
                 startForeground(NOTIFICATION_ID, buildNotification(title))
                 startSoundAndVibration()
             }
-            ACTION_STOP -> {
-                stopSelfAndCleanup()
-            }
+            ACTION_STOP -> stopSelfAndCleanup()
             ACTION_SNOOZE -> {
-                val delay = intent.getIntExtra("delay_minutes", 10)
-                val id = activeAlarmId ?: "default"
-                val title = _ringingAlarmTitle.value ?: "Alarme"
-
-                AlarmScheduler(this).scheduleSnooze(id, title, delay)
+                val delay    = intent.getIntExtra("delay_minutes", 10)
+                val id       = activeAlarmId ?: "default"
+                val title    = _ringingAlarmTitle.value ?: "Alarm"
+                val ringtone = activeRingtoneType ?: RingtoneType.WAKEUP
+                AlarmScheduler(this).scheduleSnooze(id, title, ringtone, delay)
                 stopSelfAndCleanup()
             }
         }
-
         return START_NOT_STICKY
     }
 
     private fun startSoundAndVibration() {
-        // Audio
+        // --- Audio ---
         try {
             val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(applicationContext, alertUri)
                 setAudioAttributes(
@@ -138,10 +149,10 @@ class AlarmRingtoneService : Service() {
                 start()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Erreur démarrage sonnerie", e)
+            Log.e(TAG, "Failed to start ringtone", e)
         }
 
-        // Vibration
+        // --- Vibration ---
         try {
             val pattern = longArrayOf(0, 800, 400, 800, 400)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -151,78 +162,48 @@ class AlarmRingtoneService : Service() {
                 vibrator?.vibrate(pattern, 0)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Erreur vibration", e)
+            Log.e(TAG, "Failed to start vibration", e)
         }
     }
 
     private fun stopSelfAndCleanup() {
-        try {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur arrêt media player", e)
-        } finally {
-            mediaPlayer = null
-        }
+        try { mediaPlayer?.stop(); mediaPlayer?.release() }
+        catch (e: Exception) { Log.e(TAG, "Error stopping media player", e) }
+        finally { mediaPlayer = null }
 
-        try {
-            vibrator?.cancel()
-        } catch (e: Exception) {
-            Log.e(TAG, "Erreur arrêt vibration", e)
-        }
+        try { vibrator?.cancel() }
+        catch (e: Exception) { Log.e(TAG, "Error stopping vibration", e) }
 
-        _isRinging.value = false
+        _isRinging.value         = false
         _ringingAlarmTitle.value = null
-        activeAlarmId = null
+        activeAlarmId            = null
+        activeRingtoneType       = null
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     private fun buildNotification(title: String): Notification {
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val openAppPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Stop Action
-        val stopIntent = Intent(this, AlarmRingtoneService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            this,
-            1,
-            stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Snooze Action
-        val snoozeIntent = Intent(this, AlarmRingtoneService::class.java).apply {
-            action = ACTION_SNOOZE
-            putExtra("delay_minutes", 10)
-        }
-        val snoozePendingIntent = PendingIntent.getService(
-            this,
-            2,
-            snoozeIntent,
+        // Tapping the notification brings the user into the app where they can
+        // stop or snooze.  No inline Stop/Snooze actions are provided on purpose.
+        // Dismissing an alarm should require opening the app.
+        val openAppPi = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("⏰ Alarme : $title")
-            .setContentText("L'alarme sonne. Appuyez pour arrêter ou répéter.")
+            .setContentTitle("⏰ Alarm: $title")
+            .setContentText("Tap to open the app and stop or snooze.")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setContentIntent(openAppPendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Arrêter", stopPendingIntent)
-            .addAction(android.R.drawable.ic_popup_sync, "Répéter (10 min)", snoozePendingIntent)
+            .setContentIntent(openAppPi)
+            // No addAction() calls, users must open the app to interact
             .build()
     }
 
@@ -230,14 +211,13 @@ class AlarmRingtoneService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Sonneries d'alarme",
+                "Alarm ringtones",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications pour les alarmes en cours de sonnerie"
-                setSound(null, null) // Le son est géré directement par MediaPlayer
+                description = "Notifications for alarms currently ringing"
+                setSound(null, null) // Sound is handled directly by MediaPlayer
             }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 

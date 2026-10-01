@@ -1,140 +1,411 @@
+#include "globals.h"
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
-#include <ArduinoJson.h>
-#include <time.h>
+#include <LittleFS.h>
 
+/*
+ * bluetooth.ino
+ * BLE server: receives commands from the phone and notifies back.
+ *
+ * Phone -> ESP  (Write characteristic):
+ *   SYNC, STOP_ALARM, SNOOZE_ALARM, DISMISS_NEXT, PUSH_RINGTONE,
+ *   UPLOAD_BEGIN, UPLOAD_CHUNK, UPLOAD_END, DELETE_RINGTONE
+ *
+ * ESP -> Phone  (Notify characteristic):
+ *   STOP_ALARM, SNOOZE_ALARM, DISMISS_NEXT,
+ *   CHUNK_ACK:<n>, UPLOAD_OK, UPLOAD_ERR
+ */
 
 #define SERVICE_UUID "12345678-1234-1234-1234-123456789abc"
 #define RX_UUID      "12345678-1234-1234-1234-123456789abd"
 #define TX_UUID      "12345678-1234-1234-1234-123456789abe"
 
-const char* device_name = "ESP32-Bapresearch";
+static const char* DEVICE_NAME = "ESP32-Bapresearch";
 
-BLECharacteristic *txCharacteristic;
+BLECharacteristic* txCharacteristic;
 
-const char* ALARM_PUSH_CMD = "SYNC_PUSH";
-const char* ACTION_FIELD = "action";
-const char* ALARMS_FIELD = "alarms";
-const char* TIMESTAMP_FIELD = "timestamp";
-const char* UTCOFFSET_FIELD = "utcOffsetSeconds";
+/* JSON action constants (must match SyncPayload.kt) */
+static const char* A_SYNC             = "SYNC";
+static const char* A_STOP_ALARM       = "STOP_ALARM";
+static const char* A_SNOOZE_ALARM     = "SNOOZE_ALARM";
+static const char* A_DISMISS_NEXT     = "DISMISS_NEXT";
+static const char* A_PUSH_RINGTONE    = "PUSH_RINGTONE";
+static const char* A_UPLOAD_BEGIN     = "UPLOAD_BEGIN";
+static const char* A_UPLOAD_CHUNK     = "UPLOAD_CHUNK";
+static const char* A_UPLOAD_END       = "UPLOAD_END";
+static const char* A_DELETE_RINGTONE  = "DELETE_RINGTONE";
 
-
-
-time_t alarmTimestamp(const char* hhmm) {
-    int hour, minute;
-
-    sscanf(hhmm, "%d:%d", &hour, &minute);
-
-    time_t now = start_time + millis()/1000;
-
-    struct tm localTime;
-    localtime_r(&now, &localTime);
-
-    localTime.tm_hour = hour;
-    localTime.tm_min  = minute;
-    localTime.tm_sec  = 0;
-
-    return mktime(&localTime);
+/* -------------------------------------------------------------------------
+ * notifyPhone  - send a JSON string to the phone via BLE Notify
+ * -------------------------------------------------------------------------*/
+void notifyPhone(const char* json) {
+    if (!txCharacteristic) return;
+    txCharacteristic->setValue(json);
+    txCharacteristic->notify();
 }
 
+/* -------------------------------------------------------------------------
+ * Upload session state
+ * -------------------------------------------------------------------------*/
+static struct UploadSession {
+    bool     active        = false;
+    String   filename;
+    File     file;
+    int      expectedIndex = 0;
+    uint32_t totalSize     = 0;
+} uploadSession;
+
+static uint32_t uploadCrc = 0xFFFFFFFFu;
+
+static void crcUpdate(const uint8_t* data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        uploadCrc ^= data[i];
+        for (int b = 0; b < 8; b++)
+            uploadCrc = (uploadCrc >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(uploadCrc & 1)));
+    }
+}
+static uint32_t crcFinalise() { return uploadCrc ^ 0xFFFFFFFFu; }
+
+/* -------------------------------------------------------------------------
+ * Base64 decoder
+ * -------------------------------------------------------------------------*/
+static const int8_t B64[256] = {
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
+    52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,
+    -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
+    15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+    -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+    41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+};
+
+static int b64Decode(const char* src, size_t srcLen, uint8_t* out, size_t outMax) {
+    size_t   n    = 0;
+    uint32_t buf  = 0;
+    int      bits = 0;
+    for (size_t i = 0; i < srcLen; i++) {
+        int8_t v = B64[(uint8_t)src[i]];
+        if (v < 0) continue;
+        buf = (buf << 6) | (uint32_t)v;
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            if (n >= outMax) return -1;
+            out[n++] = (uint8_t)(buf >> bits);
+        }
+    }
+    return (int)n;
+}
+
+/* -------------------------------------------------------------------------
+ * Recurrence JSON parser
+ * -------------------------------------------------------------------------*/
+static Recurrence parseRecurrence(JsonObject rec) {
+    Recurrence r;
+    if (rec.isNull()) { r.type = REC_DAILY; return r; }
+
+    const char* t = rec["type"] | "daily";
+    if (strcmp(t, "weekly") == 0) {
+        r.type = REC_WEEKLY;
+        std::string ds(rec["days"] | "");
+        std::string tok;
+        for (size_t i = 0; i <= ds.size(); i++) {
+            char c = (i < ds.size()) ? ds[i] : ',';
+            if (c == ',') {
+                if (!tok.empty()) {
+                    int d = atoi(tok.c_str());
+                    if (d >= 1 && d <= 7) r.days.insert(d);
+                    tok.clear();
+                }
+            } else { tok += c; }
+        }
+        if (r.days.empty()) r.type = REC_DAILY;
+    } else if (strcmp(t, "interval") == 0) {
+        r.type     = REC_INTERVAL;
+        r.interval = max(1, (int)(rec["intervalDays"] | 1));
+    } else {
+        r.type = REC_DAILY;
+    }
+    return r;
+}
+
+/* -------------------------------------------------------------------------
+ * RingtoneSlot JSON parser
+ * -------------------------------------------------------------------------*/
+static RingtoneSlot parseSlot(JsonObject obj, RingtoneType type) {
+    RingtoneSlot s;
+    s.hour         = obj["h"]           | 0;
+    s.minute       = obj["m"]           | 0;
+    s.ringOnDevice = obj["ringDevice"]  | false;
+    s.ringOnPhone  = obj["ringPhone"]   | false;
+
+    // Those are not transmitted as they are mandatory by design
+    switch (type){
+        case RT_LOCK_PHONE:
+            s.ringOnPhone = true;
+            break;
+        case RT_WAKEUP:
+            s.ringOnDevice = true;
+            break;
+    }
+    s.enabled      = true; // disabled slots are not transmitted
+    return s;
+}
+
+/* -------------------------------------------------------------------------
+ * Alarm JSON parser
+ * -------------------------------------------------------------------------*/
+static void parseAndStoreAlarm(JsonObject obj) {
+    const char* idStr = obj["id"] | "";
+    if (strlen(idStr) == 0) return;
+
+    Alarm a;
+    a.id        = std::string(idStr);
+    a.isEnabled = true;
+
+    const char* rf = obj["file"] | "";
+    a.ringtoneFile = (strlen(rf) > 0) ? (std::string("/") + rf) : std::string("");
+
+    /* Three-slot model */
+    if (obj.containsKey("lock")) {
+        a.lockPhone = parseSlot(obj["lock"].as<JsonObject>());
+    }
+    if (obj.containsKey("bed")){
+        a.bedtime   = parseSlot(obj["bed"].as<JsonObject>());
+    }
+    if (obj.containsKey("wake")){
+        a.wakeup    = parseSlot(obj["wake"].as<JsonObject>());
+    } 
+
+    /* Dismissed set */
+    a.dismissedMask = 0;
+    if (obj.containsKey("dismissed")) {
+        for (JsonVariant v : obj["dismissed"].as<JsonArray>()) {
+            RingtoneType rt = ringtoneFromWire(v.as<const char*>());
+            if (rt != RT_UNKNOWN) a.setDismissed(rt, true);
+        }
+    }
+
+    if (obj.containsKey("recurrence"))
+        a.recurrence = parseRecurrence(obj["recurrence"].as<JsonObject>());
+    else
+        a.recurrence.type = REC_DAILY;
+
+    alarms[a.id] = a;
+}
+
+/* -------------------------------------------------------------------------
+ * BLE write callback  (runs on the BLE RTOS task, core 0)
+ * -------------------------------------------------------------------------*/
 class RXCallbacks : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* ch) override {
+        String raw = ch->getValue();
+        if (raw.length() == 0) return;
 
-    void onWrite(BLECharacteristic *characteristic) override {
-
-        String message = characteristic->getValue();
-        JsonDocument doc;
-
-        DeserializationError error = deserializeJson(doc, message);
-
-        if (error) {
-            show("Received invalid JSON", message.c_str());
+        /* Legacy plain-text snooze from very old firmware */
+        if (raw.startsWith("SNOOZE:")) {
+            int min = raw.substring(7).toInt();
+            snoozeAlarm((min > 0) ? min : 10);
             return;
         }
 
-        start_time = (doc[TIMESTAMP_FIELD] | start_time) - millis()/1000 + (doc[UTCOFFSET_FIELD] | 0);
+        JsonDocument doc;
+        if (deserializeJson(doc, raw) != DeserializationError::Ok) {
+            show("BLE", "Bad JSON");
+            return;
+        }
 
-        const char* cmd = doc[ACTION_FIELD];
+        /* Update local clock */
+        if (doc.containsKey("timestamp")) {
+            long long ts      = doc["timestamp"].as<long long>();
+            long      utcOff  = doc["utcOffsetSec"] | 0L;
+            start_time = (time_t)(ts + utcOff) - (time_t)(millis() / 1000);
+        }
 
-        if (strcmp(cmd, ALARM_PUSH_CMD) == 0 && doc.containsKey(ALARMS_FIELD)) {
-            JsonArray alarms = doc[ALARMS_FIELD];
-            for(JsonObject alarm : alarms){
-                next_alarm = alarmTimestamp(alarm["start"]);
+        const char* action = doc["action"] | "";
+
+        /* ---- SYNC -------------------------------------------- */
+        if (strcmp(action, A_SYNC) == 0 && doc.containsKey("alarms")) {
+            alarms.clear();
+            for (JsonObject obj : doc["alarms"].as<JsonArray>())
+                parseAndStoreAlarm(obj);
+            setNextAlarm();
+            return;
+        }
+
+        /* ---- STOP_ALARM ------------------------------------------- */
+        if (strcmp(action, A_STOP_ALARM) == 0) {
+            const char* alarmId  = doc["alarmId"]  | "";
+            RingtoneType rt      = ringtoneFromWire(doc["ringtone"] | "");
+
+            /* Guard: only stop if it is the alarm that is currently ringing.
+               An empty alarmId means "stop anything" (legacy / test). */
+            bool matches = (strlen(alarmId) == 0) ||
+                           (firingAlarmId == std::string(alarmId) &&
+                            (rt == RT_UNKNOWN || rt == firingRingtone));
+            if (matches && isRinging) {
+                stopAlarm();
             }
+            return;
+        }
 
+        /* ---- SNOOZE_ALARM ----------------------------------------- */
+        if (strcmp(action, A_SNOOZE_ALARM) == 0) {
+            const char* alarmId = doc["alarmId"] | "";
+            RingtoneType rt     = ringtoneFromWire(doc["ringtone"] | "");
+            int minutes         = doc["minutes"] | 10;
+
+            bool matches = (strlen(alarmId) == 0) ||
+                           (firingAlarmId == std::string(alarmId) &&
+                            (rt == RT_UNKNOWN || rt == firingRingtone));
+            if (matches && isRinging) {
+                snoozeAlarm(minutes);
+            }
+            return;
+        }
+
+        /* ---- DISMISS_NEXT ----------------------------------------- */
+        if (strcmp(action, A_DISMISS_NEXT) == 0) {
+            const char* alarmId  = doc["alarmId"]  | "";
+            RingtoneType rt      = ringtoneFromWire(doc["ringtone"] | "");
+            bool dismissed       = doc["dismissed"] | true;
+
+            if (strlen(alarmId) > 0 && rt != RT_UNKNOWN) {
+                auto it = alarms.find(std::string(alarmId));
+                if (it != alarms.end()) {
+                    it->second.setDismissed(rt, dismissed);
+                    setNextAlarm(); /* recalculate in case it affects the schedule */
+                }
+            }
+            return;
+        }
+
+        /* ---- PUSH_RINGTONE ---------------------------------------- */
+        if (strcmp(action, A_PUSH_RINGTONE) == 0) {
+            const char* alarmId = doc["alarmId"] | "";
+            RingtoneType rt     = ringtoneFromWire(doc["ringtone"] | "");
+
+            /* Set firingAlarmId so the ringtone file can be looked up */
+            firingAlarmId  = std::string(alarmId);
+            firingRingtone = (rt != RT_UNKNOWN) ? rt : RT_WAKEUP;
+            startRinging();
+            return;
+        }
+
+        /* ---- UPLOAD_BEGIN ----------------------------------------- */
+        if (strcmp(action, A_UPLOAD_BEGIN) == 0) {
+            const char* fname = doc["filename"] | "";
+            uint32_t    size  = doc["size"]     | 0u;
+            if (strlen(fname) == 0 || size == 0) return;
+
+            if (uploadSession.active && uploadSession.file)
+                uploadSession.file.close();
+
+            String path = String("/") + fname;
+            uploadSession.file = LittleFS.open(path, "w");
+            if (!uploadSession.file) { notifyPhone("{\"ack\":\"UPLOAD_ERR\"}"); return; }
+            uploadSession.active        = true;
+            uploadSession.filename      = path;
+            uploadSession.expectedIndex = 0;
+            uploadSession.totalSize     = size;
+            uploadCrc                   = 0xFFFFFFFFu;
+            return;
+        }
+
+        /* ---- UPLOAD_CHUNK ----------------------------------------- */
+        if (strcmp(action, A_UPLOAD_CHUNK) == 0) {
+            if (!uploadSession.active) return;
+            int         idx = doc["index"] | -1;
+            const char* b64 = doc["data"]  | "";
+            if (idx != uploadSession.expectedIndex) return;
+
+            uint8_t buf[512];
+            int     len = b64Decode(b64, strlen(b64), buf, sizeof(buf));
+            if (len < 0) { notifyPhone("UPLOAD_ERR"); return; }
+
+            uploadSession.file.write(buf, (size_t)len);
+            crcUpdate(buf, (size_t)len);
+            uploadSession.expectedIndex++;
+
+            char ack[32];
+            snprintf(ack, sizeof(ack), "CHUNK_ACK:%d", idx);
+            notifyPhone(ack);
+            return;
+        }
+
+        /* ---- UPLOAD_END ------------------------------------------- */
+        if (strcmp(action, A_UPLOAD_END) == 0) {
+            if (!uploadSession.active) return;
+            uploadSession.file.close();
+            uploadSession.active = false;
+
+            uint32_t expected = doc["crc"] | 0u;
+            if (expected == crcFinalise()) {
+                notifyPhone("UPLOAD_OK");
+            } else {
+                LittleFS.remove(uploadSession.filename);
+                notifyPhone("UPLOAD_ERR");
+            }
+            return;
+        }
+
+        /* ---- DELETE_RINGTONE -------------------------------------- */
+        if (strcmp(action, A_DELETE_RINGTONE) == 0) {
+            const char* fname = doc["filename"] | "";
+            if (strlen(fname) > 0)
+                LittleFS.remove(String("/") + fname);
+            return;
         }
     }
 };
 
+/* -------------------------------------------------------------------------
+ * BLE server callbacks
+ * -------------------------------------------------------------------------*/
 class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer *server) override {
-        show("CONNECTED");
-    }
-
-    void onDisconnect(BLEServer *server) override {
-        show("DISCONNECTED");
-
-        // Recommence à annoncer
+    void onConnect(BLEServer*)    override { show("BLE", "CONNECTED"); }
+    void onDisconnect(BLEServer*) override {
+        show("BLE", "DISCONNECTED");
         BLEDevice::startAdvertising();
     }
-
 };
 
+/* -------------------------------------------------------------------------
+ * initBluetoothServer
+ * -------------------------------------------------------------------------*/
+void initBluetoothServer() {
+    BLEDevice::init(DEVICE_NAME);
 
-void initBluetoothServer(){
-  
-    BLEDevice::init(device_name);
-    BLEServer *server = BLEDevice::createServer();
-
+    BLEServer* server = BLEDevice::createServer();
     server->setCallbacks(new ServerCallbacks());
 
-    BLEService *service = server->createService(SERVICE_UUID);
+    BLEService* service = server->createService(SERVICE_UUID);
 
-
-
-    // -----------------------
-    // RX : téléphone -> ESP32
-    // -----------------------
-
-    BLECharacteristic *rxCharacteristic =
-        service->createCharacteristic(
-            RX_UUID,
-            BLECharacteristic::PROPERTY_WRITE
-        );
-
-    rxCharacteristic->setCallbacks(
-        new RXCallbacks()
-    );
-
-    // -----------------------
-    // TX : ESP32 -> téléphone
-    // -----------------------
+    BLECharacteristic* rx = service->createCharacteristic(
+        RX_UUID, BLECharacteristic::PROPERTY_WRITE);
+    rx->setCallbacks(new RXCallbacks());
 
     txCharacteristic = service->createCharacteristic(
-        TX_UUID,
-        BLECharacteristic::PROPERTY_NOTIFY
-    );
-
-    txCharacteristic->addDescriptor(
-        new BLE2902()
-    );
-
+        TX_UUID, BLECharacteristic::PROPERTY_NOTIFY);
+    txCharacteristic->addDescriptor(new BLE2902());
 
     service->start();
 
-    // =========================
-    // ADVERTISING
-    // =========================
-
-    BLEAdvertising *advertising = BLEDevice::getAdvertising();
-
-    advertising->addServiceUUID(SERVICE_UUID);
-    advertising->setScanResponse(true);
-
+    BLEAdvertising* adv = BLEDevice::getAdvertising();
+    adv->addServiceUUID(SERVICE_UUID);
+    adv->setScanResponse(true);
     BLEDevice::startAdvertising();
 
-    show("ADVERTISING", device_name);
+    show("BLE ready", DEVICE_NAME);
 }
-
-

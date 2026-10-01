@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.nfc.NdefMessage
+import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
@@ -20,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import com.example.alarmcontroller.communication.ble.BleAutoConnectService
 import com.example.alarmcontroller.ui.MainScreen
 import com.example.alarmcontroller.ui.MainViewModel
 import com.example.alarmcontroller.ui.theme.AlarmControllerTheme
@@ -29,6 +32,9 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private var nfcAdapter: NfcAdapter? = null
 
+    // Tracks whether the app is currently in write-tag mode (set from NfcTagConfigScreen)
+    var nfcWriteMode: String? = null  // "ODODO" | "OBOULO" | null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -36,36 +42,30 @@ class MainActivity : ComponentActivity() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         checkNfcIntent(intent)
 
+        // Start the BLE background service so autoConnect keeps working when the
+        // app is not in the foreground.
+        BleAutoConnectService.start(this)
+
         setContent {
             AlarmControllerTheme {
-                var hasPermissions by remember {
-                    mutableStateOf(checkRequiredPermissions())
-                }
+                var hasPermissions by remember { mutableStateOf(checkRequiredPermissions()) }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestMultiplePermissions()
-                ) { permissionsMap ->
-                    hasPermissions = permissionsMap.values.all { it }
-                }
+                    ActivityResultContracts.RequestMultiplePermissions()
+                ) { map -> hasPermissions = map.values.all { it } }
 
-                // Check Bluetooth is turned ON
                 LaunchedEffect(hasPermissions) {
                     if (hasPermissions && !viewModel.isBluetoothEnabled) {
-                        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                         try {
-                            startActivity(enableBtIntent)
-                        } catch (e: SecurityException) {
-                            // Ignored if permissions not active yet
-                        }
+                            startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                        } catch (_: SecurityException) {}
                     }
                 }
 
                 MainScreen(
                     viewModel = viewModel,
                     hasPermissions = hasPermissions,
-                    onRequestPermissions = {
-                        permissionLauncher.launch(getRequiredPermissions())
-                    }
+                    onRequestPermissions = { permissionLauncher.launch(getRequiredPermissions()) }
                 )
             }
         }
@@ -73,13 +73,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Active la lecture NFC prioritaire en premier plan
-        val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+        // Enable foreground NFC dispatch so the activity gets priority over all tags
+        val pi = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_MUTABLE
         )
-        nfcAdapter?.enableForegroundDispatch(this, pendingIntent, null, null)
+        nfcAdapter?.enableForegroundDispatch(this, pi, null, null)
     }
 
     override fun onPause() {
@@ -93,38 +93,104 @@ class MainActivity : ComponentActivity() {
         checkNfcIntent(intent)
     }
 
+    /**
+     * Routes NFC intents depending on the current mode:
+     *  - Write mode: write the configured payload onto the scanned tag.
+     *  - Normal mode: read the tag payload and dispatch to the ViewModel.
+     */
     private fun checkNfcIntent(intent: Intent?) {
         val action = intent?.action ?: return
-        if (action == NfcAdapter.ACTION_TAG_DISCOVERED ||
-            action == NfcAdapter.ACTION_NDEF_DISCOVERED ||
-            action == NfcAdapter.ACTION_TECH_DISCOVERED
-        ) {
-            viewModel.onNfcTagDetected()
+        val isNfcAction = action == NfcAdapter.ACTION_TAG_DISCOVERED ||
+                          action == NfcAdapter.ACTION_NDEF_DISCOVERED ||
+                          action == NfcAdapter.ACTION_TECH_DISCOVERED
+        if (!isNfcAction) return
+
+        val writePayload = nfcWriteMode
+        if (writePayload != null) {
+            // Write mode: encode the payload onto the tag, then exit write mode
+            val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, android.nfc.Tag::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+            }
+            if (tag != null) {
+                viewModel.writeNfcTag(tag, writePayload)
+            }
+            nfcWriteMode = null
+        } else {
+            // Normal mode: read and dispatch
+            val tagPayload = readNdefTextPayload(intent)
+            viewModel.onNfcTagDetected(tagPayload)
         }
     }
+
+    // ------------------------------------------------------------------
+    // NDEF helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Reads the first NDEF TEXT record from the intent and returns its text,
+     * or null if no TEXT record is found.
+     *
+     * NDEF TEXT record payload layout:
+     *   Byte 0    : status byte  (bits 0-5 = lang length, bit 7 = UTF-16 flag)
+     *   Bytes 1..N: language code (e.g. "en")
+     *   Rest      : actual text (UTF-8 or UTF-16)
+     */
+    private fun readNdefTextPayload(intent: Intent): String? {
+        val rawMessages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+        } ?: return null
+
+        for (raw in rawMessages) {
+            val msg = raw as? NdefMessage ?: continue
+            for (record in msg.records) {
+                val text = extractTextFromRecord(record)
+                if (text != null) return text
+            }
+        }
+        return null
+    }
+
+    private fun extractTextFromRecord(record: NdefRecord): String? {
+        if (record.tnf != NdefRecord.TNF_WELL_KNOWN) return null
+        if (!record.type.contentEquals(NdefRecord.RTD_TEXT)) return null
+        return try {
+            val payload    = record.payload
+            val statusByte = payload[0].toInt() and 0xFF
+            val isUtf16    = (statusByte and 0x80) != 0
+            val langLen    = statusByte and 0x3F
+            val encoding   = if (isUtf16) Charsets.UTF_16 else Charsets.UTF_8
+            String(payload, 1 + langLen, payload.size - 1 - langLen, encoding).trim()
+        } catch (_: Exception) { null }
+    }
+
+    // ------------------------------------------------------------------
+    // Permissions
+    // ------------------------------------------------------------------
 
     private fun getRequiredPermissions(): Array<String> {
-        val permissions = mutableListOf<String>()
-
+        val perms = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions.add(Manifest.permission.BLUETOOTH_SCAN)
-            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            perms += Manifest.permission.BLUETOOTH_SCAN
+            perms += Manifest.permission.BLUETOOTH_CONNECT
         } else {
-            permissions.add(Manifest.permission.BLUETOOTH)
-            permissions.add(Manifest.permission.BLUETOOTH_ADMIN)
-            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            perms += Manifest.permission.BLUETOOTH
+            perms += Manifest.permission.BLUETOOTH_ADMIN
+            perms += Manifest.permission.ACCESS_FINE_LOCATION
         }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            perms += Manifest.permission.POST_NOTIFICATIONS
         }
-
-        return permissions.toTypedArray()
+        return perms.toTypedArray()
     }
 
-    private fun checkRequiredPermissions(): Boolean {
-        return getRequiredPermissions().all { perm ->
-            ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+    private fun checkRequiredPermissions() =
+        getRequiredPermissions().all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
-    }
 }
