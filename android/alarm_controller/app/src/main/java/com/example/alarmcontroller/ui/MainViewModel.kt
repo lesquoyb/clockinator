@@ -44,6 +44,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val nfcHandler      = NfcActionHandler(application)
 
     val lockModeManager: LockModeManager = nfcHandler.lockModeManager
+    val isSetupRequired: Boolean = alarmRepository.isSetupRequired()
+
+    fun completeSetup() {
+        alarmRepository.markSetupCompleted()
+    }
 
     // Focus-mode onboarding
     private val _showFocusOnboarding = MutableStateFlow(!alarmRepository.isFocusOnboardingDone())
@@ -328,10 +333,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
+        val slotLabel = when (ringtone) {
+            RingtoneType.LOCK_PHONE -> "bedtime start"
+            RingtoneType.BEDTIME -> "bedtime"
+            RingtoneType.WAKEUP -> "wake-up"
+        }
         _statusAlert.value = if (newDismiss)
-            "Alarm '${alarm.title}' [${ringtone.wire}] skipped for the next occurrence."
+            "${alarm.title}: next $slotLabel skipped."
         else
-            "Alarm '${alarm.title}' [${ringtone.wire}] re-enabled."
+            "${alarm.title}: $slotLabel restored."
     }
 
     // ------------------------------------------------------------------

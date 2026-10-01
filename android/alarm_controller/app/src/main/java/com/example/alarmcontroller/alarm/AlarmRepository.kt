@@ -21,6 +21,7 @@ class AlarmRepository(context: Context) {
         private const val KEY_AUTO_SYNC_HOURS        = "auto_sync_hours"
         private const val KEY_RINGTONE_FILES         = "uploaded_ringtone_files"
         private const val KEY_FOCUS_ONBOARDING_DONE  = "focus_onboarding_done"
+        private const val KEY_SETUP_COMPLETED       = "setup_completed"
         private const val DEFAULT_AUTO_SYNC_HOURS    = 0
     }
 
@@ -29,11 +30,25 @@ class AlarmRepository(context: Context) {
     // ------------------------------------------------------------------
 
     fun getAlarms(): List<AlarmItem> {
-        val raw = prefs.getString(KEY_ALARMS, null) ?: return defaultAlarms()
+        val raw = prefs.getString(KEY_ALARMS, null) ?: return emptyList()
         return try {
             val arr = JSONArray(raw)
             (0 until arr.length()).map { AlarmItem.fromJson(arr.getJSONObject(it)) }
-        } catch (_: Exception) { defaultAlarms() }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun isSetupRequired(): Boolean {
+        if (prefs.contains(KEY_SETUP_COMPLETED)) {
+            return !prefs.getBoolean(KEY_SETUP_COMPLETED, false)
+        }
+
+        val existingInstall = prefs.contains(KEY_ALARMS) || prefs.contains(KEY_LAST_BLE_MAC)
+        if (existingInstall) prefs.edit().putBoolean(KEY_SETUP_COMPLETED, true).apply()
+        return !existingInstall
+    }
+
+    fun markSetupCompleted() {
+        prefs.edit().putBoolean(KEY_SETUP_COMPLETED, true).apply()
     }
 
     fun saveAlarms(alarms: List<AlarmItem>) {
@@ -149,13 +164,4 @@ class AlarmRepository(context: Context) {
         return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
     }
 
-    private fun defaultAlarms(): List<AlarmItem> = listOf(
-        AlarmItem(
-            title     = "Main Alarm",
-            isEnabled = true,
-            lockPhone = RingtoneSlot(hour = 22, minute = 0),
-            bedtime   = RingtoneSlot(hour = 22, minute = 0, enabled = false),
-            wakeup    = RingtoneSlot(hour = 7,  minute = 0)
-        )
-    )
 }

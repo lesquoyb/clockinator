@@ -2,6 +2,7 @@ package com.example.alarmcontroller.ui
 
 import android.app.TimePickerDialog
 import android.text.format.DateFormat
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -14,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -107,13 +110,14 @@ fun AlarmDialog(
     // ── Ringtone file ─────────────────────────────────────────────────
     var ringtoneFile by remember { mutableStateOf(initialAlarm?.ringtoneFile ?: "") }
 
+    var showNightOptions by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).widthIn(max = 560.dp).heightIn(max = 840.dp),
+        modifier = Modifier.fillMaxSize(),
         properties = DialogProperties(usePlatformDefaultWidth = false),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(0.dp),
         title = {
             Text(
                 if (initialAlarm == null) "New alarm" else "Edit alarm",
@@ -133,46 +137,10 @@ fun AlarmDialog(
                     singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
 
-                // ── LOCK_PHONE slot ───────────────────────────────────
-                SlotSection(
-                    title        = "Lock-phone time",
-                    subtitle     = "Phone locks & focus mode activates",
-                    hour         = lpHour,
-                    minute       = lpMin,
-                    ringOnPhone  = lpPhone,
-                    ringOnDevice = lpDevice,
-                    enabled      = true,
-                    showEnabledToggle = false,
-                    onTimeChange   = { h, m -> lpHour = h; lpMin = m },
-                    onPhoneChange  = { lpPhone  = it },
-                    onDeviceChange = { lpDevice = it },
-                    onEnabledChange = {}
-                )
-
-                HorizontalDivider()
-
-                // ── BEDTIME slot (optional) ───────────────────────────
-                SlotSection(
-                    title        = "Bedtime",
-                    subtitle     = "Optional. ESP LED lights up at this time.",
-                    hour         = btHour,
-                    minute       = btMin,
-                    ringOnPhone  = btPhone,
-                    ringOnDevice = btDevice,
-                    enabled      = btEnabled,
-                    showEnabledToggle = true,
-                    onTimeChange   = { h, m -> btHour = h; btMin = m },
-                    onPhoneChange  = { btPhone  = it },
-                    onDeviceChange = { btDevice = it },
-                    onEnabledChange = { btEnabled = it }
-                )
-
-                HorizontalDivider()
-
-                // ── WAKEUP slot ───────────────────────────────────────
+                SectionLabel("Wake-up")
                 SlotSection(
                     title        = "Wake-up time",
-                    subtitle     = "Focus mode releases",
+                    subtitle     = "When you want to get up",
                     hour         = wuHour,
                     minute       = wuMin,
                     ringOnPhone  = wuPhone,
@@ -185,9 +153,6 @@ fun AlarmDialog(
                     onEnabledChange = {}
                 )
 
-                HorizontalDivider()
-
-                // ── Recurrence ────────────────────────────────────────
                 SectionLabel("Recurrence")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(listOf("daily", "weekly", "interval")) { mode ->
@@ -225,51 +190,103 @@ fun AlarmDialog(
                     )
                 }
 
-                HorizontalDivider()
-
-                // ── Ringtone file ─────────────────────────────────────
-                SectionLabel("Ringtone file (ESP32)")
-                OutlinedTextField(
-                    value = ringtoneFile,
-                    onValueChange = { ringtoneFile = it },
-                    label = { Text("Filename on device (e.g. alarm1.wav)") },
-                    singleLine = true,
-                    placeholder = { Text("Leave empty for built-in melody") },
+                Surface(
+                    onClick = { showNightOptions = !showNightOptions },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                     modifier = Modifier.fillMaxWidth()
-                )
-
-                HorizontalDivider()
-
-                // ── Snooze durations ──────────────────────────────────
-                SectionLabel("Snooze durations (min)")
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(snoozeDurations.sorted()) { dur ->
-                        InputChip(
-                            selected = false, onClick = {},
-                            label = { Text("${dur}m") },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick  = { snoozeDurations = snoozeDurations.toMutableList().also { it.remove(dur) } },
-                                    modifier = Modifier.size(16.dp)
-                                ) { Icon(Icons.Default.Close, null, Modifier.size(12.dp)) }
-                            }
+                ) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Night routine & sound", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Focus starts ${String.format(Locale.getDefault(), "%02d:%02d", lpHour, lpMin)}" +
+                                    if (btEnabled) " · bedtime ${String.format(Locale.getDefault(), "%02d:%02d", btHour, btMin)}" else "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            if (showNightOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (showNightOptions) "Hide night routine options" else "Show night routine options"
                         )
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newDurText, onValueChange = { if (it.length <= 4) newDurText = it },
-                        label = { Text("Add (min)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true, modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = {
-                        val v = newDurText.toIntOrNull()
-                        if (v != null && v in 1..1440 && v !in snoozeDurations) {
-                            snoozeDurations = (snoozeDurations + v).toMutableList()
-                            newDurText = ""
+
+                AnimatedVisibility(showNightOptions) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        HorizontalDivider()
+                        SectionLabel("Night routine")
+                        SlotSection(
+                            title = "Focus start",
+                            subtitle = "Phone focus mode and smart clock",
+                            hour = lpHour,
+                            minute = lpMin,
+                            ringOnPhone = lpPhone,
+                            ringOnDevice = lpDevice,
+                            enabled = true,
+                            showEnabledToggle = false,
+                            onTimeChange = { h, m -> lpHour = h; lpMin = m },
+                            onPhoneChange = { lpPhone = it },
+                            onDeviceChange = { lpDevice = it },
+                            onEnabledChange = {}
+                        )
+                        HorizontalDivider()
+                        SlotSection(
+                            title = "Bedtime",
+                            subtitle = "Optional light and reminder",
+                            hour = btHour,
+                            minute = btMin,
+                            ringOnPhone = btPhone,
+                            ringOnDevice = btDevice,
+                            enabled = btEnabled,
+                            showEnabledToggle = true,
+                            onTimeChange = { h, m -> btHour = h; btMin = m },
+                            onPhoneChange = { btPhone = it },
+                            onDeviceChange = { btDevice = it },
+                            onEnabledChange = { btEnabled = it }
+                        )
+                        HorizontalDivider()
+                        SectionLabel("Sound & snooze")
+                        OutlinedTextField(
+                            value = ringtoneFile,
+                            onValueChange = { ringtoneFile = it },
+                            label = { Text("Ringtone file on device") },
+                            singleLine = true,
+                            placeholder = { Text("Built-in melody") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Snooze durations", style = MaterialTheme.typography.labelLarge)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(snoozeDurations.sorted()) { dur ->
+                                InputChip(
+                                    selected = false, onClick = {},
+                                    label = { Text("${dur}m") },
+                                    trailingIcon = {
+                                        IconButton(
+                                            onClick = { snoozeDurations = snoozeDurations.toMutableList().also { it.remove(dur) } },
+                                            modifier = Modifier.size(32.dp)
+                                        ) { Icon(Icons.Default.Close, "Remove ${dur} minutes", Modifier.size(16.dp)) }
+                                    }
+                                )
+                            }
                         }
-                    }) { Icon(Icons.Default.Add, "Add duration") }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(
+                                value = newDurText, onValueChange = { if (it.length <= 4) newDurText = it },
+                                label = { Text("Add snooze minutes") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true, modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = {
+                                val value = newDurText.toIntOrNull()
+                                if (value != null && value in 1..1440 && value !in snoozeDurations) {
+                                    snoozeDurations = (snoozeDurations + value).toMutableList()
+                                    newDurText = ""
+                                }
+                            }) { Icon(Icons.Default.Add, "Add snooze duration") }
+                        }
+                    }
                 }
 
                 if (errorMsg != null) {

@@ -2,6 +2,7 @@ package com.example.alarmcontroller.ui
 
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -17,11 +18,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,11 +61,9 @@ fun MainScreen(
     val connectionState  by viewModel.connectionState.collectAsState()
     val alarms           by viewModel.alarms.collectAsState()
     val hasPendingSync   by viewModel.hasPendingSync.collectAsState()
-    val isLocked         by viewModel.lockModeManager.isLocked.collectAsState()
     val isPhoneRinging   by viewModel.isPhoneAlarmRinging.collectAsState()
     val ringingTitle     by viewModel.ringingAlarmTitle.collectAsState()
     val statusAlert      by viewModel.statusAlert.collectAsState()
-    val showFocusOnboard by viewModel.showFocusOnboarding.collectAsState()
 
     val isConnected = connectionState is ConnectionState.Connected
     val connectionLabel = when (connectionState) {
@@ -77,48 +78,114 @@ fun MainScreen(
         is ConnectionState.Error -> StatusDisconnected
         ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
     }
-    var selectedTab  by remember { mutableIntStateOf(0) }
-    var showAlarmDialog by remember { mutableStateOf(false) }
+    val deviceSummary = if (hasPendingSync) "$connectionLabel · Sync pending" else connectionLabel
+    var currentPage by rememberSaveable {
+        mutableStateOf(if (viewModel.isSetupRequired) "setup_device" else "home")
+    }
+    var editorOrigin by rememberSaveable { mutableStateOf("home") }
     var editingAlarm    by remember { mutableStateOf<AlarmItem?>(null) }
+
+    fun finishSetup() {
+        viewModel.completeSetup()
+        viewModel.stopScan()
+        currentPage = "home"
+    }
+
+    fun openAlarmEditor(alarm: AlarmItem? = null) {
+        editingAlarm = alarm
+        editorOrigin = currentPage
+        currentPage = "alarm_editor"
+    }
+
+    fun closeAlarmEditor() {
+        currentPage = editorOrigin
+        editingAlarm = null
+    }
+
+    BackHandler(enabled = currentPage != "home" && currentPage != "setup_device") {
+        currentPage = when (currentPage) {
+            "setup_alarm" -> "setup_device"
+            "alarm_editor" -> editorOrigin
+            else -> "home"
+        }
+    }
+
+    LaunchedEffect(currentPage) {
+        if (currentPage != "setup_device") viewModel.stopScan()
+    }
 
     // Focus mode onboarding bottom sheet, launched with Activity context via LocalContext
     val context = androidx.compose.ui.platform.LocalContext.current
+    val snackbarState = remember { SnackbarHostState() }
     LaunchedEffect(viewModel) {
         viewModel.nfcToastMessages.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
-
-    if (showFocusOnboard) {
-        FocusModeOnboardingSheet(
-            hasDndPermission = viewModel.lockModeManager.hasDndPermission(),
-            onOpenDndSettings = { context.startActivity(viewModel.dndSettingsIntent()) },
-            onOpenFocusMode   = { context.startActivity(viewModel.focusModeIntent()) },
-            onDismiss         = { viewModel.dismissFocusOnboarding() }
-        )
+    LaunchedEffect(statusAlert) {
+        statusAlert?.let {
+            snackbarState.showSnackbar(it)
+            viewModel.clearAlert()
+        }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarState) },
+        floatingActionButton = {
+            if (currentPage == "home" && alarms.isNotEmpty()) {
+                FloatingActionButton(onClick = { openAlarmEditor() }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add alarm")
+                }
+            }
+        },
         topBar = {
-            TopAppBar(
+            if (currentPage != "alarm_editor") TopAppBar(
                 title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Clockinator", style = MaterialTheme.typography.titleLarge)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(connectionColor))
-                            Text(connectionLabel, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    when (currentPage) {
+                        "setup_device" -> Text("Set up your alarm")
+                        "setup_alarm" -> Text("Your first wake-up")
+                        "home" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Clockinator", style = MaterialTheme.typography.titleLarge)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                Box(Modifier.size(8.dp).clip(CircleShape).background(connectionColor))
+                                Text(deviceSummary, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            }
+                        }
+                        "settings" -> Text("More settings")
+                        "device" -> Text("Alarm clock")
+                        else -> Text(if (editingAlarm == null) "New alarm" else "Edit alarm")
+                    }
+                },
+                navigationIcon = {
+                    if (currentPage != "home" && currentPage != "setup_device") {
+                        IconButton(onClick = {
+                            currentPage = when (currentPage) {
+                                "setup_alarm" -> "setup_device"
+                                "alarm_editor" -> editorOrigin
+                                else -> "home"
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
                 actions = {
-                    if (isLocked) {
-                        Icon(Icons.Default.Lock, contentDescription = "Focus mode active",
-                            tint = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 8.dp))
-                    }
-                    if (hasPendingSync) {
-                        Icon(Icons.Default.Sync, contentDescription = "Alarm sync pending",
-                            tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 8.dp))
+                    when (currentPage) {
+                        "home" -> {
+                            IconButton(onClick = { currentPage = "device" }) {
+                                Icon(
+                                    if (isConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
+                                    contentDescription = "Alarm clock connection: $connectionLabel"
+                                )
+                            }
+                            IconButton(onClick = { currentPage = "settings" }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings")
+                            }
+                        }
+                        "setup_device", "setup_alarm" -> TextButton(onClick = { finishSetup() }) {
+                            Text("Set up later")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -126,66 +193,65 @@ fun MainScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding)) {
-
-            // Ringing banner, always visible on top regardless of tab
             AnimatedVisibility(visible = isPhoneRinging) {
                 RingingBanner(
-                    modifier        = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    title           = ringingTitle ?: "Alarm",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    title = ringingTitle ?: "Alarm",
                     snoozeDurations = viewModel.currentSnoozeDurations(),
-                    onStop          = { viewModel.stopPhoneAlarm() },
-                    onSnooze        = { viewModel.snoozePhoneAlarm(it) }
+                    onStop = { viewModel.stopPhoneAlarm() },
+                    onSnooze = { viewModel.snoozePhoneAlarm(it) }
                 )
             }
-
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 },
-                    text = { Text("Alarms (${alarms.size})") },
-                    icon = { Icon(Icons.Default.Alarm, contentDescription = null) })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 },
-                    text = { Text("Device") },
-                    icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) })
-                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 },
-                    text = { Text("Settings") },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) })
-            }
-
-            Box(Modifier.fillMaxSize()) {
-                when (selectedTab) {
-                    0 -> AlarmsTab(
-                        alarms        = alarms,
-                        onAdd         = { editingAlarm = null; showAlarmDialog = true },
-                        onEdit        = { editingAlarm = it;   showAlarmDialog = true },
-                        onToggle      = { a, en -> viewModel.toggleAlarm(a, en) },
-                        onDismissNext = { alarm, rt -> viewModel.toggleDismissNext(alarm, rt) },
-                        onDelete      = { viewModel.deleteAlarm(it) }
-                    )
-                    1 -> DeviceTab(
-                        viewModel        = viewModel,
-                        hasPermissions   = hasPermissions,
-                        onRequestPerms   = onRequestPermissions,
-                        connectionState  = connectionState,
-                        scannedDevices   = viewModel.scannedDevices.collectAsState().value,
-                        isScanning       = viewModel.isScanning.collectAsState().value,
-                        messages         = viewModel.messages.collectAsState().value,
-                        isConnected      = isConnected
-                    )
-                    2 -> SettingsTab(
-                        viewModel   = viewModel,
-                        isConnected = isConnected,
-                        onWriteNfcTag = { payload ->
-                            (context as? MainActivity)?.beginNfcTagWrite(payload)
-                        }
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+            when (currentPage) {
+                "setup_device" -> SetupDeviceScreen(
+                    hasPermissions = hasPermissions,
+                    connectionState = connectionState,
+                    devices = viewModel.scannedDevices.collectAsState().value,
+                    isScanning = viewModel.isScanning.collectAsState().value,
+                    onRequestPermissions = onRequestPermissions,
+                    onStartScan = { viewModel.startScan() },
+                    onStopScan = { viewModel.stopScan() },
+                    onConnect = { viewModel.connectDevice(it) },
+                    onContinue = { viewModel.stopScan(); currentPage = "setup_alarm" }
+                )
+                "setup_alarm" -> SetupAlarmScreen(
+                    onCreateAlarm = { openAlarmEditor() }
+                )
+                "home" -> {
+                    AlarmsTab(
+                        alarms = alarms,
+                        onAdd = { openAlarmEditor() },
+                        onEdit = { openAlarmEditor(it) },
+                        onToggle = { alarm, enabled -> viewModel.toggleAlarm(alarm, enabled) },
+                        onDismissNext = { alarm, type -> viewModel.toggleDismissNext(alarm, type) },
+                        onDelete = { viewModel.deleteAlarm(it) }
                     )
                 }
+                "settings" -> SettingsTab(
+                    viewModel = viewModel,
+                    isConnected = isConnected,
+                    onWriteNfcTag = { payload -> (context as? MainActivity)?.beginNfcTagWrite(payload) },
+                    onOpenDevice = { currentPage = "device" }
+                )
+                "device" -> DeviceTab(
+                    viewModel = viewModel,
+                    hasPermissions = hasPermissions,
+                    onRequestPerms = onRequestPermissions,
+                    connectionState = connectionState,
+                    scannedDevices = viewModel.scannedDevices.collectAsState().value,
+                    isScanning = viewModel.isScanning.collectAsState().value,
+                    messages = viewModel.messages.collectAsState().value,
+                    isConnected = isConnected
+                )
             }
         }
+        }
 
-        // Alarm create/edit dialog
-        if (showAlarmDialog) {
+        if (currentPage == "alarm_editor") {
             AlarmDialog(
                 initialAlarm = editingAlarm,
-                onDismiss    = { showAlarmDialog = false },
+                onDismiss    = { closeAlarmEditor() },
                 onSave       = { title, lockPhone, bedtime, wakeup, rec, snoozeDurs, ringtoneFile ->
                     viewModel.addOrUpdateAlarm(
                         id           = editingAlarm?.id,
@@ -197,20 +263,11 @@ fun MainScreen(
                         snoozeDurations = snoozeDurs,
                         ringtoneFile = ringtoneFile
                     )
-                    showAlarmDialog = false
+                    if (editorOrigin == "setup_alarm") finishSetup() else closeAlarmEditor()
                 }
             )
         }
 
-        // Generic status alert
-        if (statusAlert != null) {
-            AlertDialog(
-                onDismissRequest = { viewModel.clearAlert() },
-                title   = { Text("Info") },
-                text    = { Text(statusAlert ?: "") },
-                confirmButton = { TextButton(onClick = { viewModel.clearAlert() }) { Text("OK") } }
-            )
-        }
     }
 }
 
@@ -278,44 +335,38 @@ fun AlarmsTab(
     onDismissNext: (AlarmItem, com.example.alarmcontroller.alarm.RingtoneType) -> Unit,
     onDelete: (AlarmItem) -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Alarms", style = MaterialTheme.typography.headlineSmall)
-            IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = "Add alarm")
+    if (alarms.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Alarm, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(16.dp))
+                Text("No alarms yet", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(6.dp))
+                Text("Add your first wake-up to get started.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onAdd) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Create an alarm")
+                }
             }
         }
-        Text("${alarms.size} ${if (alarms.size == 1) "alarm" else "alarms"}",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(16.dp))
-
-        if (alarms.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.AlarmOff, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(12.dp))
-                    Text("No alarms yet", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Create an alarm to get started", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = onAdd) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Add alarm")
-                    }
+    } else {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 20.dp, bottom = 96.dp)
+        ) {
+            item {
+                Column(Modifier.padding(bottom = 4.dp)) {
+                    Text("Your alarms", style = MaterialTheme.typography.headlineSmall)
+                    Text("${alarms.count { it.isEnabled }} active · ${alarms.size} total",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-        } else {
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)) {
-                items(alarms, key = { it.id }) { alarm ->
-                    AlarmCard(alarm, onEdit = { onEdit(alarm) }, onToggle = { onToggle(alarm, it) },
-                        onDismissNext = { rt -> onDismissNext(alarm, rt) }, onDelete = { onDelete(alarm) })
-                }
+            items(alarms, key = { it.id }) { alarm ->
+                AlarmCard(alarm, onEdit = { onEdit(alarm) }, onToggle = { onToggle(alarm, it) },
+                    onDismissNext = { rt -> onDismissNext(alarm, rt) }, onDelete = { onDelete(alarm) })
             }
         }
     }
@@ -329,7 +380,8 @@ fun AlarmCard(
     onDismissNext: (com.example.alarmcontroller.alarm.RingtoneType) -> Unit,
     onDelete: () -> Unit
 ) {
-    val anyDismissed = alarm.dismissedRingtones.isNotEmpty()
+    var confirmDelete by remember { mutableStateOf(false) }
+    val wakeupSkipped = alarm.isDismissed(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP)
     Card(
         shape  = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
@@ -338,9 +390,7 @@ fun AlarmCard(
         ),
         modifier = Modifier.fillMaxWidth().animateContentSize()
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-
-            // Title + global toggle
+        Column(Modifier.padding(18.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -348,70 +398,69 @@ fun AlarmCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(alarm.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                    if (alarm.ringtoneFile != null) {
-                        Text("Device tone · ${alarm.ringtoneFile}", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                    }
+                    Text(if (alarm.isEnabled) "Active" else "Off",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (alarm.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = alarm.isEnabled, onCheckedChange = onToggle)
             }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Three slot rows
-            SlotRow(
-                label        = "Lock",
-                time         = alarm.lockPhoneFormatted,
-                ringOnPhone  = alarm.lockPhone.ringOnPhone,
-                ringOnDevice = alarm.lockPhone.ringOnDevice,
-                dismissed    = alarm.isDismissed(com.example.alarmcontroller.alarm.RingtoneType.LOCK_PHONE),
-                enabled      = alarm.isEnabled,
-                onDismissToggle = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.LOCK_PHONE) }
-            )
-            HorizontalDivider(Modifier.padding(vertical = 5.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
-            if (alarm.isBedtimeActive) {
-                SlotRow(
-                    label        = "Bedtime",
-                    time         = alarm.bedtimeFormatted,
-                    ringOnPhone  = alarm.bedtime.ringOnPhone,
-                    ringOnDevice = alarm.bedtime.ringOnDevice,
-                    dismissed    = alarm.isDismissed(com.example.alarmcontroller.alarm.RingtoneType.BEDTIME),
-                    enabled      = alarm.isEnabled,
-                    onDismissToggle = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.BEDTIME) }
-                )
-                HorizontalDivider(Modifier.padding(vertical = 5.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            }
-
-            SlotRow(
-                label        = "Wakeup",
-                time         = alarm.wakeupFormatted,
-                ringOnPhone  = alarm.wakeup.ringOnPhone,
-                ringOnDevice = alarm.wakeup.ringOnDevice,
-                dismissed    = alarm.isDismissed(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP),
-                enabled      = alarm.isEnabled,
-                onDismissToggle = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP) }
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // Recurrence badge + edit/delete
+            Spacer(Modifier.height(16.dp))
             Row(
-                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth()
             ) {
-                PillBadge(
-                    alarm.recurrence.summary(),
-                    MaterialTheme.colorScheme.secondaryContainer,
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Row {
-                    IconButton(onClick = onEdit)   { Icon(Icons.Default.Edit,   "Edit alarm") }
-                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete alarm", tint = MaterialTheme.colorScheme.error) }
+                Column {
+                    Text("NEXT WAKE-UP", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(alarm.wakeupFormatted, style = MaterialTheme.typography.headlineLarge,
+                        fontFamily = FontFamily.Monospace,
+                        color = if (alarm.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(alarm.recurrence.summary(), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (alarm.isBedtimeActive) Text("Bedtime ${alarm.bedtimeFormatted}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Edit")
+                }
+                if (alarm.isEnabled) {
+                    FilledTonalButton(
+                        onClick = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP) },
+                        modifier = Modifier.weight(1.4f)
+                    ) {
+                        Icon(if (wakeupSkipped) Icons.Default.Replay else Icons.Default.SkipNext,
+                            contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (wakeupSkipped) "Undo skip" else "Skip next")
+                    }
+                }
+                IconButton(onClick = { confirmDelete = true }) {
+                    Icon(Icons.Default.DeleteOutline, contentDescription = "Delete alarm",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete ${alarm.title}?") },
+            text = { Text("This alarm will be removed from your phone and Clockinator.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
     }
 }
 
@@ -608,7 +657,8 @@ fun DeviceTab(
 fun SettingsTab(
     viewModel: MainViewModel,
     isConnected: Boolean,
-    onWriteNfcTag: (String) -> Unit
+    onWriteNfcTag: (String) -> Unit,
+    onOpenDevice: () -> Unit
 ) {
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
     val uploadedRingtones by viewModel.uploadedRingtones.collectAsState()
@@ -636,6 +686,12 @@ fun SettingsTab(
             Text("Settings", style = MaterialTheme.typography.headlineSmall)
             Text("Personalise alarms and your connected device", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        SettingsSection(title = "Alarm clock") {
+            Text(if (isConnected) "Connected and syncing alarms" else "Not connected",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onOpenDevice) { Text("Manage connection") }
         }
 
         // ── NFC Tags ─────────────────────────────────────────────────
@@ -753,14 +809,6 @@ fun SettingsTab(
             }
         }
 
-        // ── NFC simulation ────────────────────────────────────────────
-        SettingsSection(title = "Simulate NFC (testing)") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { viewModel.onNfcTagDetected(null) }, modifier = Modifier.weight(1f)) { Text("Generic", fontSize = 11.sp) }
-                OutlinedButton(onClick = { viewModel.onNfcTagDetected("ODODO") }, modifier = Modifier.weight(1f)) { Text("ODODO", fontSize = 11.sp) }
-                OutlinedButton(onClick = { viewModel.onNfcTagDetected("OBOULO") }, modifier = Modifier.weight(1f)) { Text("OBOULO", fontSize = 11.sp) }
-            }
-        }
     }
 }
 
