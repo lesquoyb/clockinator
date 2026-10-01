@@ -31,10 +31,13 @@ class AlarmRepository(context: Context) {
 
     fun getAlarms(): List<AlarmItem> {
         val raw = prefs.getString(KEY_ALARMS, null) ?: return emptyList()
-        return try {
+        val loaded = try {
             val arr = JSONArray(raw)
             (0 until arr.length()).map { AlarmItem.fromJson(arr.getJSONObject(it)) }
         } catch (_: Exception) { emptyList() }
+        val normalized = loaded.map { it.withRequiredSoundOutputs() }
+        if (normalized != loaded) saveAlarms(normalized)
+        return normalized
     }
 
     fun isSetupRequired(): Boolean {
@@ -53,7 +56,7 @@ class AlarmRepository(context: Context) {
 
     fun saveAlarms(alarms: List<AlarmItem>) {
         val arr = JSONArray()
-        alarms.forEach { arr.put(it.toJson()) }
+        alarms.forEach { arr.put(it.withRequiredSoundOutputs().toJson()) }
         prefs.edit().putString(KEY_ALARMS, arr.toString()).apply()
     }
 

@@ -134,16 +134,16 @@ fun MainScreen(
         floatingActionButton = {
             if (currentPage == "home" && alarms.isNotEmpty()) {
                 FloatingActionButton(onClick = { openAlarmEditor() }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add alarm")
+                    Icon(Icons.Default.Add, contentDescription = "Add routine")
                 }
             }
         },
         topBar = {
-            if (currentPage != "alarm_editor") TopAppBar(
+            TopAppBar(
                 title = {
                     when (currentPage) {
                         "setup_device" -> Text("Set up your alarm")
-                        "setup_alarm" -> Text("Your first wake-up")
+                        "setup_alarm" -> Text("Your first routine")
                         "home" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("Clockinator", style = MaterialTheme.typography.titleLarge)
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -154,7 +154,7 @@ fun MainScreen(
                         }
                         "settings" -> Text("More settings")
                         "device" -> Text("Alarm clock")
-                        else -> Text(if (editingAlarm == null) "New alarm" else "Edit alarm")
+                        else -> Text(if (editingAlarm == null) "New routine" else "Edit routine")
                     }
                 },
                 navigationIcon = {
@@ -244,28 +244,25 @@ fun MainScreen(
                     messages = viewModel.messages.collectAsState().value,
                     isConnected = isConnected
                 )
+                "alarm_editor" -> AlarmDialog(
+                    initialAlarm = editingAlarm,
+                    onDismiss = { closeAlarmEditor() },
+                    onSave = { title, lockPhone, bedtime, wakeup, recurrence, snoozeDurations, ringtoneFile ->
+                        viewModel.addOrUpdateAlarm(
+                            id = editingAlarm?.id,
+                            title = title,
+                            lockPhone = lockPhone,
+                            bedtime = bedtime,
+                            wakeup = wakeup,
+                            recurrence = recurrence,
+                            snoozeDurations = snoozeDurations,
+                            ringtoneFile = ringtoneFile
+                        )
+                        if (editorOrigin == "setup_alarm") finishSetup() else closeAlarmEditor()
+                    }
+                )
             }
         }
-        }
-
-        if (currentPage == "alarm_editor") {
-            AlarmDialog(
-                initialAlarm = editingAlarm,
-                onDismiss    = { closeAlarmEditor() },
-                onSave       = { title, lockPhone, bedtime, wakeup, rec, snoozeDurs, ringtoneFile ->
-                    viewModel.addOrUpdateAlarm(
-                        id           = editingAlarm?.id,
-                        title        = title,
-                        lockPhone    = lockPhone,
-                        bedtime      = bedtime,
-                        wakeup       = wakeup,
-                        recurrence   = rec,
-                        snoozeDurations = snoozeDurs,
-                        ringtoneFile = ringtoneFile
-                    )
-                    if (editorOrigin == "setup_alarm") finishSetup() else closeAlarmEditor()
-                }
-            )
         }
 
     }
@@ -340,14 +337,14 @@ fun AlarmsTab(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Alarm, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(16.dp))
-                Text("No alarms yet", style = MaterialTheme.typography.titleLarge)
+                Text("No routines yet", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(6.dp))
-                Text("Add your first wake-up to get started.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Set up Focus, Bedtime and Wake-up in one routine.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(20.dp))
                 Button(onClick = onAdd) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Create an alarm")
+                    Text("Create a routine")
                 }
             }
         }
@@ -359,8 +356,8 @@ fun AlarmsTab(
         ) {
             item {
                 Column(Modifier.padding(bottom = 4.dp)) {
-                    Text("Your alarms", style = MaterialTheme.typography.headlineSmall)
-                    Text("${alarms.count { it.isEnabled }} active · ${alarms.size} total",
+                    Text("Routines", style = MaterialTheme.typography.headlineSmall)
+                    Text("${alarms.count { it.isEnabled }} active · ${alarms.size} routines",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -381,7 +378,10 @@ fun AlarmCard(
     onDelete: () -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
-    val wakeupSkipped = alarm.isDismissed(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP)
+    val focusType = com.example.alarmcontroller.alarm.RingtoneType.LOCK_PHONE
+    val bedtimeType = com.example.alarmcontroller.alarm.RingtoneType.BEDTIME
+    val wakeupType = com.example.alarmcontroller.alarm.RingtoneType.WAKEUP
+    val wakeupSkipped = alarm.isDismissed(wakeupType)
     Card(
         shape  = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
@@ -398,33 +398,46 @@ fun AlarmCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(alarm.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                    Text(if (alarm.isEnabled) "Active" else "Off",
+                    Text(if (alarm.isEnabled) "Routine on" else "Routine off",
                         style = MaterialTheme.typography.labelMedium,
                         color = if (alarm.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = alarm.isEnabled, onCheckedChange = onToggle)
             }
-            Spacer(Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
-                    Text("NEXT WAKE-UP", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(alarm.wakeupFormatted, style = MaterialTheme.typography.headlineLarge,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (alarm.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(alarm.recurrence.summary(), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (alarm.isBedtimeActive) Text("Bedtime ${alarm.bedtimeFormatted}",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            Text(alarm.recurrence.summary(), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            RoutineEventRow(
+                label = "Focus",
+                time = alarm.lockPhoneFormatted,
+                phoneOn = true,
+                deviceOn = alarm.lockPhone.ringOnDevice,
+                skipped = alarm.isDismissed(focusType),
+                emphasized = false,
+                enabled = alarm.isEnabled
+            )
+            if (alarm.isBedtimeActive) {
+                HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                RoutineEventRow(
+                    label = "Bedtime",
+                    time = alarm.bedtimeFormatted,
+                    phoneOn = alarm.bedtime.ringOnPhone,
+                    deviceOn = alarm.bedtime.ringOnDevice,
+                    skipped = alarm.isDismissed(bedtimeType),
+                    emphasized = false,
+                    enabled = alarm.isEnabled
+                )
             }
-            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            RoutineEventRow(
+                label = "Wake-up",
+                time = alarm.wakeupFormatted,
+                phoneOn = alarm.wakeup.ringOnPhone,
+                deviceOn = true,
+                skipped = wakeupSkipped,
+                emphasized = true,
+                enabled = alarm.isEnabled
+            )
+            Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
@@ -434,7 +447,7 @@ fun AlarmCard(
                 }
                 if (alarm.isEnabled) {
                     FilledTonalButton(
-                        onClick = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP) },
+                        onClick = { onDismissNext(wakeupType) },
                         modifier = Modifier.weight(1.4f)
                     ) {
                         Icon(if (wakeupSkipped) Icons.Default.Replay else Icons.Default.SkipNext,
@@ -455,7 +468,7 @@ fun AlarmCard(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete ${alarm.title}?") },
-            text = { Text("This alarm will be removed from your phone and Clockinator.") },
+            text = { Text("This routine will be removed from your phone and Clockinator.") },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
             },
@@ -520,6 +533,49 @@ private fun SlotRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun RoutineEventRow(
+    label: String,
+    time: String,
+    phoneOn: Boolean,
+    deviceOn: Boolean,
+    skipped: Boolean,
+    emphasized: Boolean,
+    enabled: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.titleSmall,
+                    color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                if (skipped) {
+                    Text("Skipped next", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error)
+                }
+            }
+            Text(time, style = if (emphasized) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                fontFamily = FontFamily.Monospace,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (phoneOn) OutputIndicator("Phone", Icons.Default.PhoneAndroid)
+            if (deviceOn) OutputIndicator("Alarm clock", Icons.Default.Alarm)
+        }
+    }
+}
+
+@Composable
+private fun OutputIndicator(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

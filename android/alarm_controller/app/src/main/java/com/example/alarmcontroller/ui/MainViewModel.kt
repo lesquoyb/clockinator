@@ -295,7 +295,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             wakeup          = wakeup,
             snoozeDurations = snoozeDurations,
             ringtoneFile    = ringtoneFile
-        )
+        ).withRequiredSoundOutputs()
         alarmRepository.addOrUpdateAlarm(alarm)
         alarmScheduler.scheduleAlarm(alarm)
         loadAlarms()

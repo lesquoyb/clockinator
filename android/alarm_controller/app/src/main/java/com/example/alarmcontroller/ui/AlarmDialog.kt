@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -26,16 +27,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import com.example.alarmcontroller.alarm.AlarmItem
 import com.example.alarmcontroller.alarm.Recurrence
 import com.example.alarmcontroller.alarm.RingtoneSlot
 import java.util.Locale
 
 /**
- * Create / edit dialog for an [AlarmItem].
+ * Create / edit a wake-up routine represented by an [AlarmItem].
  *
- * The three ringtone slots (lock_phone, bedtime, wakeup) each expose:
+    * The three routine events (focus, bedtime, wakeup) each expose:
  *   - time picker (native Android TimePickerDialog)
  *   - ring on phone toggle
  *   - ring on device toggle
@@ -58,24 +58,27 @@ fun AlarmDialog(
     ) -> Unit
 ) {
     // ── Title ────────────────────────────────────────────────────────
-    var title by remember { mutableStateOf(initialAlarm?.title ?: "Alarm") }
+    var title by remember { mutableStateOf(initialAlarm?.title ?: "Routine") }
 
     // ── Slot states (stored directly as Int) ─────────────────────────
     var lpHour    by remember { mutableIntStateOf(initialAlarm?.lockPhone?.hour   ?: 22) }
     var lpMin     by remember { mutableIntStateOf(initialAlarm?.lockPhone?.minute  ?: 0) }
-    var lpPhone   by remember { mutableStateOf(initialAlarm?.lockPhone?.ringOnPhone  ?: true) }
+    var lpPhone   by remember { mutableStateOf(true) }
     var lpDevice  by remember { mutableStateOf(initialAlarm?.lockPhone?.ringOnDevice ?: true) }
 
     var btEnabled by remember { mutableStateOf(initialAlarm?.bedtime?.enabled ?: false) }
     var btHour    by remember { mutableIntStateOf(initialAlarm?.bedtime?.hour    ?: 23) }
     var btMin     by remember { mutableIntStateOf(initialAlarm?.bedtime?.minute   ?: 0) }
-    var btPhone   by remember { mutableStateOf(initialAlarm?.bedtime?.ringOnPhone  ?: false) }
-    var btDevice  by remember { mutableStateOf(initialAlarm?.bedtime?.ringOnDevice ?: true) }
+    val bedtimeNeedsOutput = initialAlarm?.bedtime?.let {
+        it.enabled && !it.ringOnPhone && !it.ringOnDevice
+    } ?: false
+    var btPhone   by remember { mutableStateOf(initialAlarm?.bedtime?.ringOnPhone ?: bedtimeNeedsOutput) }
+    var btDevice  by remember { mutableStateOf(initialAlarm?.bedtime?.ringOnDevice ?: !bedtimeNeedsOutput) }
 
     var wuHour    by remember { mutableIntStateOf(initialAlarm?.wakeup?.hour    ?: 7) }
     var wuMin     by remember { mutableIntStateOf(initialAlarm?.wakeup?.minute   ?: 0) }
     var wuPhone   by remember { mutableStateOf(initialAlarm?.wakeup?.ringOnPhone  ?: true) }
-    var wuDevice  by remember { mutableStateOf(initialAlarm?.wakeup?.ringOnDevice ?: true) }
+    var wuDevice  by remember { mutableStateOf(true) }
 
     // ── Recurrence ───────────────────────────────────────────────────
     var recMode by remember {
@@ -113,47 +116,74 @@ fun AlarmDialog(
     var showNightOptions by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxSize(),
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-        shape = RoundedCornerShape(0.dp),
-        title = {
-            Text(
-                if (initialAlarm == null) "New alarm" else "Edit alarm",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
 
                 // ── Alarm name ────────────────────────────────────────
                 OutlinedTextField(
                     value = title, onValueChange = { title = it },
-                    label = { Text("Alarm name") },
+                    label = { Text("Routine name") },
                     singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+
+                SectionLabel("Focus")
+                SlotSection(
+                    title = "Focus start",
+                    subtitle = "Phone focus mode and smart clock",
+                    hour = lpHour,
+                    minute = lpMin,
+                    ringOnPhone = true,
+                    ringOnDevice = lpDevice,
+                    enabled = true,
+                    showEnabledToggle = false,
+                    phoneRequired = true,
+                    onTimeChange = { h, m -> lpHour = h; lpMin = m },
+                    onPhoneChange = {},
+                    onDeviceChange = { lpDevice = it },
+                    onEnabledChange = {}
+                )
+                HorizontalDivider()
+                SlotSection(
+                    title = "Bedtime",
+                    subtitle = "Optional, but at least one sound output is required",
+                    hour = btHour,
+                    minute = btMin,
+                    ringOnPhone = btPhone,
+                    ringOnDevice = btDevice,
+                    enabled = btEnabled,
+                    showEnabledToggle = true,
+                    requireOneOutput = true,
+                    onTimeChange = { h, m -> btHour = h; btMin = m },
+                    onPhoneChange = { btPhone = it },
+                    onDeviceChange = { btDevice = it },
+                    onEnabledChange = {
+                        btEnabled = it
+                        if (it && !btPhone && !btDevice) btPhone = true
+                    }
                 )
 
                 SectionLabel("Wake-up")
                 SlotSection(
-                    title        = "Wake-up time",
-                    subtitle     = "When you want to get up",
-                    hour         = wuHour,
-                    minute       = wuMin,
-                    ringOnPhone  = wuPhone,
-                    ringOnDevice = wuDevice,
-                    enabled      = true,
+                    title = "Wake-up time",
+                    subtitle = "The alarm clock always sounds",
+                    hour = wuHour,
+                    minute = wuMin,
+                    ringOnPhone = wuPhone,
+                    ringOnDevice = true,
+                    enabled = true,
                     showEnabledToggle = false,
-                    onTimeChange   = { h, m -> wuHour = h; wuMin = m },
-                    onPhoneChange  = { wuPhone  = it },
-                    onDeviceChange = { wuDevice = it },
+                    deviceRequired = true,
+                    onTimeChange = { h, m -> wuHour = h; wuMin = m },
+                    onPhoneChange = { wuPhone = it },
+                    onDeviceChange = {},
                     onEnabledChange = {}
                 )
 
-                SectionLabel("Recurrence")
+                SectionLabel("Repeats")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(listOf("daily", "weekly", "interval")) { mode ->
                         FilterChip(
@@ -172,10 +202,10 @@ fun AlarmDialog(
                         items(listOf("M", "Tu", "W", "Th", "F", "Sa", "Su").mapIndexed { index, label -> index + 1 to label }) { (day, label) ->
                             FilterChip(
                                 selected = day in selectedDays,
-                                onClick  = {
+                                onClick = {
                                     selectedDays = if (day in selectedDays) selectedDays - day else selectedDays + day
                                 },
-                                label    = { Text(label) }
+                                label = { Text(label) }
                             )
                         }
                     }
@@ -186,7 +216,8 @@ fun AlarmDialog(
                         onValueChange = { if (it.length <= 3) intervalText = it },
                         label = { Text("Interval in days (1-365)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
@@ -198,10 +229,9 @@ fun AlarmDialog(
                 ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Night routine & sound", style = MaterialTheme.typography.titleSmall)
+                            Text("Sound & snooze", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Focus starts ${String.format(Locale.getDefault(), "%02d:%02d", lpHour, lpMin)}" +
-                                    if (btEnabled) " · bedtime ${String.format(Locale.getDefault(), "%02d:%02d", btHour, btMin)}" else "",
+                                "${snoozeDurations.size} snooze options · ${ringtoneFile.ifBlank { "Built-in melody" }}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -216,38 +246,7 @@ fun AlarmDialog(
                 AnimatedVisibility(showNightOptions) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         HorizontalDivider()
-                        SectionLabel("Night routine")
-                        SlotSection(
-                            title = "Focus start",
-                            subtitle = "Phone focus mode and smart clock",
-                            hour = lpHour,
-                            minute = lpMin,
-                            ringOnPhone = lpPhone,
-                            ringOnDevice = lpDevice,
-                            enabled = true,
-                            showEnabledToggle = false,
-                            onTimeChange = { h, m -> lpHour = h; lpMin = m },
-                            onPhoneChange = { lpPhone = it },
-                            onDeviceChange = { lpDevice = it },
-                            onEnabledChange = {}
-                        )
-                        HorizontalDivider()
-                        SlotSection(
-                            title = "Bedtime",
-                            subtitle = "Optional light and reminder",
-                            hour = btHour,
-                            minute = btMin,
-                            ringOnPhone = btPhone,
-                            ringOnDevice = btDevice,
-                            enabled = btEnabled,
-                            showEnabledToggle = true,
-                            onTimeChange = { h, m -> btHour = h; btMin = m },
-                            onPhoneChange = { btPhone = it },
-                            onDeviceChange = { btDevice = it },
-                            onEnabledChange = { btEnabled = it }
-                        )
-                        HorizontalDivider()
-                        SectionLabel("Sound & snooze")
+                        SectionLabel("Ringtone")
                         OutlinedTextField(
                             value = ringtoneFile,
                             onValueChange = { ringtoneFile = it },
@@ -293,44 +292,52 @@ fun AlarmDialog(
                     Text(errorMsg!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val recurrence = when (recMode) {
-                    "weekly" -> {
-                        if (selectedDays.isEmpty()) { errorMsg = "Select at least one day."; return@Button }
-                        Recurrence.Weekly(selectedDays)
+            Row(
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                Button(onClick = {
+                    val recurrence = when (recMode) {
+                        "weekly" -> {
+                            if (selectedDays.isEmpty()) { errorMsg = "Select at least one day."; return@Button }
+                            Recurrence.Weekly(selectedDays)
+                        }
+                        "interval" -> {
+                            val interval = intervalText.toIntOrNull()
+                            if (interval == null || interval !in 1..365) {
+                                errorMsg = "Interval must be 1-365 days."
+                                return@Button
+                            }
+                            Recurrence.EveryDays(interval)
+                        }
+                        else -> Recurrence.Daily
                     }
-                    "interval" -> {
-                        val iv = intervalText.toIntOrNull()
-                        if (iv == null || iv !in 1..365) { errorMsg = "Interval must be 1-365 days."; return@Button }
-                        Recurrence.EveryDays(iv)
-                    }
-                    else -> Recurrence.Daily
+
+                    val finalDurations = snoozeDurations.sorted().ifEmpty { AlarmItem.DEFAULT_SNOOZE_DURATIONS }
+                    val finalRingtoneFile = ringtoneFile.trim().ifEmpty { null }
+
+                    onSave(
+                        title.ifBlank { "Routine" },
+                        RingtoneSlot(lpHour, lpMin, ringOnPhone = lpPhone, ringOnDevice = lpDevice),
+                        RingtoneSlot(
+                            if (btEnabled) btHour else lpHour,
+                            if (btEnabled) btMin else lpMin,
+                            ringOnPhone = btPhone,
+                            ringOnDevice = btDevice,
+                            enabled = btEnabled
+                        ),
+                        RingtoneSlot(wuHour, wuMin, ringOnPhone = wuPhone, ringOnDevice = wuDevice),
+                        recurrence,
+                        finalDurations,
+                        finalRingtoneFile
+                    )
+                }, modifier = Modifier.weight(1f)) {
+                    Text("Save routine")
                 }
-
-                val finalDurations  = snoozeDurations.sorted().ifEmpty { AlarmItem.DEFAULT_SNOOZE_DURATIONS }
-                val finalRingtoneFi = ringtoneFile.trim().ifEmpty { null }
-
-                onSave(
-                    title.ifBlank { "Alarm" },
-                    RingtoneSlot(lpHour, lpMin, ringOnPhone = lpPhone, ringOnDevice = lpDevice),
-                    RingtoneSlot(
-                        if (btEnabled) btHour else lpHour,
-                        if (btEnabled) btMin else lpMin,
-                        ringOnPhone = btPhone,
-                        ringOnDevice = btDevice,
-                        enabled = btEnabled
-                    ),
-                    RingtoneSlot(wuHour, wuMin, ringOnPhone = wuPhone, ringOnDevice = wuDevice),
-                    recurrence,
-                    finalDurations,
-                    finalRingtoneFi
-                )
-            }) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
+            }
+        }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -347,6 +354,9 @@ private fun SlotSection(
     ringOnDevice: Boolean,
     enabled: Boolean,
     showEnabledToggle: Boolean,
+    phoneRequired: Boolean = false,
+    deviceRequired: Boolean = false,
+    requireOneOutput: Boolean = false,
     onTimeChange: (hour: Int, minute: Int) -> Unit,
     onPhoneChange: (Boolean) -> Unit,
     onDeviceChange: (Boolean) -> Unit,
@@ -417,22 +427,86 @@ private fun SlotSection(
                 }
             }
 
-            // Ring-on toggles
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Switch(checked = ringOnPhone, onCheckedChange = onPhoneChange)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Phone", fontSize = 13.sp)
+            if (requireOneOutput) {
+                val selectedOutput = when {
+                    ringOnPhone && ringOnDevice -> 2
+                    ringOnPhone -> 0
+                    else -> 1
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Switch(checked = ringOnDevice, onCheckedChange = onDeviceChange)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Device", fontSize = 13.sp)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = selectedOutput == 0,
+                        onClick = { onPhoneChange(true); onDeviceChange(false) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                        label = { Text("Phone") }
+                    )
+                    SegmentedButton(
+                        selected = selectedOutput == 1,
+                        onClick = { onPhoneChange(false); onDeviceChange(true) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                        label = { Text("Clock") }
+                    )
+                    SegmentedButton(
+                        selected = selectedOutput == 2,
+                        onClick = { onPhoneChange(true); onDeviceChange(true) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                        label = { Text("Both") }
+                    )
+                }
+                Text("Keep at least one sound output on.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SoundOutputControl(
+                        modifier = Modifier.weight(1f),
+                        label = "Phone",
+                        checked = ringOnPhone,
+                        required = phoneRequired,
+                        onCheckedChange = onPhoneChange
+                    )
+                    SoundOutputControl(
+                        modifier = Modifier.weight(1f),
+                        label = "Alarm clock",
+                        checked = ringOnDevice,
+                        required = deviceRequired,
+                        onCheckedChange = onDeviceChange
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SoundOutputControl(
+    modifier: Modifier,
+    label: String,
+    checked: Boolean,
+    required: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Text(
+                when {
+                    required -> "Always on"
+                    checked -> "Sounds"
+                    else -> "Silent"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (required) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (required) {
+            Icon(Icons.Default.CheckCircle, contentDescription = "$label output required",
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        } else {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
     }
 }

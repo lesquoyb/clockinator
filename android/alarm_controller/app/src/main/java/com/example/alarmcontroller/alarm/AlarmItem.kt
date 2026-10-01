@@ -106,8 +106,8 @@ data class RingtoneSlot(
 // ---------------------------------------------------------------------------
 
 /**
- * Represents a single alarm with three optional ringtone slots:
- *   lock_phone -> bedtime (optional) -> wakeup
+ * Represents a wake-up routine with two required events and one optional event:
+ *   focus start (phone required) -> bedtime (optional) -> wake-up (device required)
  *
  * Migration from the previous two-slot model (start/end) is handled
  * transparently in [fromJson] via the back-compat block.
@@ -154,6 +154,18 @@ data class AlarmItem(
         RingtoneType.LOCK_PHONE -> lockPhone
         RingtoneType.BEDTIME    -> bedtime
         RingtoneType.WAKEUP     -> wakeup
+    }
+
+    fun withRequiredSoundOutputs(): AlarmItem {
+        val normalizedBedtime = if (
+            bedtime.enabled && !bedtime.ringOnPhone && !bedtime.ringOnDevice
+        ) bedtime.copy(ringOnPhone = true) else bedtime
+
+        return copy(
+            lockPhone = lockPhone.copy(ringOnPhone = true),
+            bedtime = normalizedBedtime,
+            wakeup = wakeup.copy(ringOnDevice = true)
+        )
     }
 
     /** True if [type] is dismissed for the next occurrence. */

@@ -170,9 +170,9 @@ fun SetupAlarmScreen(
         Text("SETUP  ·  02 / 02", style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(12.dp))
-        Text("Set your first wake-up", style = MaterialTheme.typography.headlineMedium)
+        Text("Set up your first routine", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
-        Text("Choose when to wake up and which days it repeats. You can fine-tune the other alarm times later.",
+        Text("Set Focus, optional Bedtime, Wake-up and the days it repeats.",
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
         Card(
@@ -184,9 +184,9 @@ fun SetupAlarmScreen(
                 Icon(Icons.Default.Alarm, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(28.dp))
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                    Text("Your alarms stay in sync", style = MaterialTheme.typography.titleSmall,
+                    Text("Your routine stays in sync", style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("The phone and Clockinator use the same schedule.", style = MaterialTheme.typography.bodySmall,
+                    Text("Your phone and Clockinator follow the same schedule.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
@@ -195,7 +195,7 @@ fun SetupAlarmScreen(
         Button(onClick = onCreateAlarm, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Default.Alarm, contentDescription = null)
             Spacer(Modifier.size(8.dp))
-            Text("Create first alarm")
+            Text("Create first routine")
         }
     }
 }
