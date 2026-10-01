@@ -344,6 +344,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "${alarm.title}: $slotLabel restored."
     }
 
+    fun dismissRoutineOnce(alarm: AlarmItem) {
+        val ringtoneTypes = buildList {
+            add(RingtoneType.LOCK_PHONE)
+            if (alarm.isBedtimeActive) add(RingtoneType.BEDTIME)
+            add(RingtoneType.WAKEUP)
+        }
+        val updated = ringtoneTypes.fold(alarm) { current, type ->
+            current.withDismissed(type, true)
+        }
+        alarmRepository.addOrUpdateAlarm(updated)
+        loadAlarms()
+        viewModelScope.launch {
+            ringtoneTypes.forEach { type ->
+                activeCommunicator.sendMessage(
+                    SyncPayload.buildDismissNext(alarm.id, type, dismissed = true)
+                )
+            }
+        }
+        _statusAlert.value = "${alarm.title}: next routine occurrence skipped once."
+    }
+
     // ------------------------------------------------------------------
     // Sync
     // ------------------------------------------------------------------

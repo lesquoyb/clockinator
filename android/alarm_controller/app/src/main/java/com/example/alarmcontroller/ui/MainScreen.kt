@@ -225,6 +225,7 @@ fun MainScreen(
                         onEdit = { openAlarmEditor(it) },
                         onToggle = { alarm, enabled -> viewModel.toggleAlarm(alarm, enabled) },
                         onDismissNext = { alarm, type -> viewModel.toggleDismissNext(alarm, type) },
+                        onDismissRoutineOnce = { viewModel.dismissRoutineOnce(it) },
                         onDelete = { viewModel.deleteAlarm(it) }
                     )
                 }
@@ -330,6 +331,7 @@ fun AlarmsTab(
     onEdit: (AlarmItem) -> Unit,
     onToggle: (AlarmItem, Boolean) -> Unit,
     onDismissNext: (AlarmItem, com.example.alarmcontroller.alarm.RingtoneType) -> Unit,
+    onDismissRoutineOnce: (AlarmItem) -> Unit,
     onDelete: (AlarmItem) -> Unit
 ) {
     if (alarms.isEmpty()) {
@@ -363,7 +365,9 @@ fun AlarmsTab(
             }
             items(alarms, key = { it.id }) { alarm ->
                 AlarmCard(alarm, onEdit = { onEdit(alarm) }, onToggle = { onToggle(alarm, it) },
-                    onDismissNext = { rt -> onDismissNext(alarm, rt) }, onDelete = { onDelete(alarm) })
+                    onDismissNext = { rt -> onDismissNext(alarm, rt) },
+                    onDismissRoutineOnce = { onDismissRoutineOnce(alarm) },
+                    onDelete = { onDelete(alarm) })
             }
         }
     }
@@ -375,13 +379,15 @@ fun AlarmCard(
     onEdit: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDismissNext: (com.example.alarmcontroller.alarm.RingtoneType) -> Unit,
+    onDismissRoutineOnce: () -> Unit,
     onDelete: () -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmDisable by remember { mutableStateOf(false) }
     val focusType = com.example.alarmcontroller.alarm.RingtoneType.LOCK_PHONE
     val bedtimeType = com.example.alarmcontroller.alarm.RingtoneType.BEDTIME
     val wakeupType = com.example.alarmcontroller.alarm.RingtoneType.WAKEUP
-    val wakeupSkipped = alarm.isDismissed(wakeupType)
+    val nextRingtoneType = alarm.nextRingtoneType()
     Card(
         shape  = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
@@ -402,7 +408,10 @@ fun AlarmCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = if (alarm.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = alarm.isEnabled, onCheckedChange = onToggle)
+                Switch(
+                    checked = alarm.isEnabled,
+                    onCheckedChange = { enabled -> if (enabled) onToggle(true) else confirmDisable = true }
+                )
             }
             Text(alarm.recurrence.summary(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
@@ -413,7 +422,8 @@ fun AlarmCard(
                 deviceOn = alarm.lockPhone.ringOnDevice,
                 skipped = alarm.isDismissed(focusType),
                 emphasized = false,
-                enabled = alarm.isEnabled
+                enabled = alarm.isEnabled,
+                onUndoSkip = { onDismissNext(focusType) }
             )
             if (alarm.isBedtimeActive) {
                 HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -424,7 +434,8 @@ fun AlarmCard(
                     deviceOn = alarm.bedtime.ringOnDevice,
                     skipped = alarm.isDismissed(bedtimeType),
                     emphasized = false,
-                    enabled = alarm.isEnabled
+                    enabled = alarm.isEnabled,
+                    onUndoSkip = { onDismissNext(bedtimeType) }
                 )
             }
             HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -433,9 +444,10 @@ fun AlarmCard(
                 time = alarm.wakeupFormatted,
                 phoneOn = alarm.wakeup.ringOnPhone,
                 deviceOn = true,
-                skipped = wakeupSkipped,
+                skipped = alarm.isDismissed(wakeupType),
                 emphasized = true,
-                enabled = alarm.isEnabled
+                enabled = alarm.isEnabled,
+                onUndoSkip = { onDismissNext(wakeupType) }
             )
             Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -447,13 +459,16 @@ fun AlarmCard(
                 }
                 if (alarm.isEnabled) {
                     FilledTonalButton(
-                        onClick = { onDismissNext(wakeupType) },
+                        onClick = {
+                            if (nextRingtoneType != null) onDismissNext(nextRingtoneType)
+                            else alarm.dismissedRingtones.forEach(onDismissNext)
+                        },
                         modifier = Modifier.weight(1.4f)
                     ) {
-                        Icon(if (wakeupSkipped) Icons.Default.Replay else Icons.Default.SkipNext,
+                        Icon(if (nextRingtoneType == null) Icons.Default.Replay else Icons.Default.SkipNext,
                             contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text(if (wakeupSkipped) "Undo skip" else "Skip next")
+                        Text(nextRingtoneType?.let(::skipLabel) ?: "Undo skips")
                     }
                 }
                 IconButton(onClick = { confirmDelete = true }) {
@@ -462,6 +477,25 @@ fun AlarmCard(
                 }
             }
         }
+    }
+
+    if (confirmDisable) {
+        AlertDialog(
+            onDismissRequest = { confirmDisable = false },
+            title = { Text("Pause ${alarm.title}?") },
+            text = { Text("Dismiss once skips the next Focus, Bedtime (if enabled), and Wake-up events. The routine stays on afterward.") },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { confirmDisable = false; onDismissRoutineOnce() }) {
+                        Text("Dismiss once")
+                    }
+                    TextButton(onClick = { confirmDisable = false; onToggle(false) }) {
+                        Text("Until further notice")
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDisable = false }) { Text("Cancel") } }
+        )
     }
 
     if (confirmDelete) {
@@ -544,7 +578,8 @@ private fun RoutineEventRow(
     deviceOn: Boolean,
     skipped: Boolean,
     emphasized: Boolean,
-    enabled: Boolean
+    enabled: Boolean,
+    onUndoSkip: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
@@ -562,12 +597,23 @@ private fun RoutineEventRow(
             Text(time, style = if (emphasized) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                 fontFamily = FontFamily.Monospace,
                 color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+            if (skipped) {
+                TextButton(onClick = onUndoSkip, contentPadding = PaddingValues(0.dp)) {
+                    Text("Undo skip")
+                }
+            }
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (phoneOn) OutputIndicator("Phone", Icons.Default.PhoneAndroid)
             if (deviceOn) OutputIndicator("Alarm clock", Icons.Default.Alarm)
         }
     }
+}
+
+private fun skipLabel(type: com.example.alarmcontroller.alarm.RingtoneType): String = when (type) {
+    com.example.alarmcontroller.alarm.RingtoneType.LOCK_PHONE -> "Skip Focus"
+    com.example.alarmcontroller.alarm.RingtoneType.BEDTIME -> "Skip Bedtime"
+    com.example.alarmcontroller.alarm.RingtoneType.WAKEUP -> "Skip Wake-up"
 }
 
 @Composable

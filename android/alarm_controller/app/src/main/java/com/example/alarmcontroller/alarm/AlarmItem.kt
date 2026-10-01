@@ -2,6 +2,7 @@ package com.example.alarmcontroller.alarm
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
 
@@ -168,6 +169,21 @@ data class AlarmItem(
         )
     }
 
+    fun nextRingtoneType(nowMillis: Long = System.currentTimeMillis()): RingtoneType? {
+        if (!isEnabled) return null
+
+        val candidates = buildList {
+            if (!isDismissed(RingtoneType.LOCK_PHONE)) add(RingtoneType.LOCK_PHONE)
+            if (bedtime.enabled && !isDismissed(RingtoneType.BEDTIME)) add(RingtoneType.BEDTIME)
+            if (!isDismissed(RingtoneType.WAKEUP)) add(RingtoneType.WAKEUP)
+        }
+
+        return candidates.minByOrNull { type ->
+            val slot = slot(type)
+            recurrence.nextOccurrenceTime(slot.hour, slot.minute, nowMillis)
+        }
+    }
+
     /** True if [type] is dismissed for the next occurrence. */
     fun isDismissed(type: RingtoneType): Boolean = type in dismissedRingtones
 
@@ -276,6 +292,29 @@ sealed class Recurrence {
     }
     data class EveryDays(val interval: Int) : Recurrence() {
         init { require(interval in 1..365) }
+    }
+
+    fun nextOccurrenceTime(hour: Int, minute: Int, nowMillis: Long): Long {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = nowMillis
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val today = calendar.get(Calendar.DAY_OF_WEEK).let {
+            if (it == Calendar.SUNDAY) 7 else it - 1
+        }
+        val daysToAdd = when (this) {
+            Daily -> if (calendar.timeInMillis <= nowMillis) 1 else 0
+            is Weekly -> (0..7).first { offset ->
+                val day = (today - 1 + offset) % 7 + 1
+                day in days && (offset > 0 || calendar.timeInMillis > nowMillis)
+            }
+            is EveryDays -> if (calendar.timeInMillis <= nowMillis) interval else 0
+        }
+        calendar.add(Calendar.DAY_OF_YEAR, daysToAdd)
+        return calendar.timeInMillis
     }
 
     fun toJson(): JSONObject = JSONObject().apply {

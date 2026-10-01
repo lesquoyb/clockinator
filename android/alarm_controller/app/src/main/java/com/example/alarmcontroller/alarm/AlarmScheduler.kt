@@ -7,7 +7,6 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.example.alarmcontroller.MainActivity
-import java.util.Calendar
 
 /**
  * Schedules and cancels exact Android alarms for each [AlarmItem].
@@ -142,27 +141,6 @@ class AlarmScheduler(private val context: Context) {
     }
 
     private fun computeNextTriggerTime(hour: Int, minute: Int, recurrence: Recurrence): Long {
-        val cal = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val now   = System.currentTimeMillis()
-        val today = cal.get(Calendar.DAY_OF_WEEK).let { if (it == Calendar.SUNDAY) 7 else it - 1 }
-
-        val daysToAdd = when (recurrence) {
-            Recurrence.Daily ->
-                if (cal.timeInMillis <= now) 1 else 0
-            is Recurrence.Weekly ->
-                (0..7).first { offset ->
-                    val day = (today - 1 + offset) % 7 + 1
-                    day in recurrence.days && (offset > 0 || cal.timeInMillis > now)
-                }
-            is Recurrence.EveryDays ->
-                if (cal.timeInMillis <= now) recurrence.interval else 0
-        }
-        cal.add(Calendar.DAY_OF_YEAR, daysToAdd)
-        return cal.timeInMillis
+        return recurrence.nextOccurrenceTime(hour, minute, System.currentTimeMillis())
     }
 }
