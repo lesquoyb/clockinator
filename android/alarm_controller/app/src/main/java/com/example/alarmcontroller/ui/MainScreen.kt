@@ -1,6 +1,7 @@
 package com.example.alarmcontroller.ui
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -39,6 +40,7 @@ import com.example.alarmcontroller.ui.theme.StatusConnected
 import com.example.alarmcontroller.ui.theme.StatusConnecting
 import com.example.alarmcontroller.ui.theme.StatusDisconnected
 import com.example.alarmcontroller.ui.theme.TxBadgeColor
+import kotlinx.coroutines.flow.collect
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root screen
@@ -67,6 +69,12 @@ fun MainScreen(
 
     // Focus mode onboarding bottom sheet, launched with Activity context via LocalContext
     val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.nfcToastMessages.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     if (showFocusOnboard) {
         FocusModeOnboardingSheet(
             hasDndPermission = viewModel.lockModeManager.hasDndPermission(),

@@ -25,7 +25,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import android.util.Base64
@@ -67,6 +69,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _statusAlert = MutableStateFlow<String?>(null)
     val statusAlert: StateFlow<String?> = _statusAlert.asStateFlow()
+
+    private val _nfcToastMessages = Channel<String>(Channel.BUFFERED)
+    val nfcToastMessages = _nfcToastMessages.receiveAsFlow()
 
     private val _alarms = MutableStateFlow<List<AlarmItem>>(emptyList())
     val alarms: StateFlow<List<AlarmItem>> = _alarms.asStateFlow()
@@ -498,7 +503,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onNfcTagDetected(tagPayload: String? = null) {
         when (val result = nfcHandler.handleNfcTagScanned(tagPayload)) {
             is NfcActionHandler.NfcResult.StoppedRinging -> {
-                _statusAlert.value = result.message
+                _nfcToastMessages.trySend(result.message)
                 // Mirror on ESP
                 viewModelScope.launch {
                     activeCommunicator.sendMessage(
@@ -507,9 +512,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             is NfcActionHandler.NfcResult.DismissedNext -> {
-                _statusAlert.value =
+                _nfcToastMessages.trySend(
                     "NFC: '${result.alarmTitle}' [${result.ringtone.wire}] at ${result.time} " +
                     if (result.dismissed) "skipped." else "re-enabled."
+                )
                 loadAlarms()
                 // Notify ESP
                 viewModelScope.launch {
@@ -519,10 +525,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             is NfcActionHandler.NfcResult.NoAction -> {
-                _statusAlert.value = result.message
+                _nfcToastMessages.trySend(result.message)
             }
             is NfcActionHandler.NfcResult.UnknownTag -> {
-                _statusAlert.value = "Unrecognized NFC tag: '${result.payload}'"
+                _nfcToastMessages.trySend("Unrecognized NFC tag: '${result.payload}'")
             }
         }
     }
