@@ -52,6 +52,10 @@ static void playTone(float frequency, int durationMs) {
     int       generated = 0;
 
     while (generated < samples) {
+        if (!isRinging) {
+            i2s_zero_dma_buffer(I2S_PORT);
+            return;
+        }
         int count = min(128, samples - generated);
         for (int i = 0; i < count; i++) {
             float   t      = (float)(generated + i) / SAMPLE_RATE;
@@ -67,11 +71,12 @@ static void playTone(float frequency, int durationMs) {
 
 /* Built-in fallback: Do-Mi-Sol-Mi-Do */
 static void playMelody() {
-    playTone(523.25f, 300); delay(100);
-    playTone(659.25f, 300); delay(100);
-    playTone(783.99f, 500); delay(100);
-    playTone(659.25f, 300); delay(100);
-    playTone(523.25f, 300); delay(100);
+    if (!isRinging) return;
+    playTone(523.25f, 300); if (!isRinging) return; delay(100);
+    playTone(659.25f, 300); if (!isRinging) return; delay(100);
+    playTone(783.99f, 500); if (!isRinging) return; delay(100);
+    playTone(659.25f, 300); if (!isRinging) return; delay(100);
+    playTone(523.25f, 300);
 }
 
 /* -------------------------------------------------------------------------
@@ -164,6 +169,11 @@ bool playWavFile(const char* path) {
     for (uint32_t dstFrame = 0;
          dstFrame < (uint32_t)((float)totalFrames / resampleRatio);
          dstFrame++) {
+        if (!isRinging) {
+            f.close();
+            i2s_zero_dma_buffer(I2S_PORT);
+            return false;
+        }
 
         uint32_t srcFrame = (uint32_t)((float)dstFrame * resampleRatio);
         if (srcFrame >= totalFrames) break;
@@ -189,6 +199,11 @@ bool playWavFile(const char* path) {
         outBuf[outIdx++] = lastR;
 
         if (outIdx >= 256) {
+            if (!isRinging) {
+                f.close();
+                i2s_zero_dma_buffer(I2S_PORT);
+                return false;
+            }
             size_t written;
             i2s_write(I2S_PORT, outBuf, sizeof(outBuf), &written, portMAX_DELAY);
             outIdx = 0;
@@ -196,6 +211,11 @@ bool playWavFile(const char* path) {
     }
 
     if (outIdx > 0) {
+        if (!isRinging) {
+            f.close();
+            i2s_zero_dma_buffer(I2S_PORT);
+            return false;
+        }
         size_t written;
         i2s_write(I2S_PORT, outBuf, (size_t)outIdx * sizeof(int16_t), &written, portMAX_DELAY);
     }
@@ -211,8 +231,9 @@ bool playWavFile(const char* path) {
  * otherwise falls back to the built-in melody.
  * -------------------------------------------------------------------------*/
 void playAlarm() {
+    if (!isRinging) return;
     if (strlen(activeRingtoneFile) > 0 && playWavFile(activeRingtoneFile)) {
         return;
     }
-    playMelody();
+    if (isRinging) playMelody();
 }

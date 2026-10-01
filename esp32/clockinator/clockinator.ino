@@ -120,6 +120,8 @@ void stopAlarm() {
 
     next_alarm = 0;
     setNextAlarm();
+    firingAlarmId.clear();
+    firingRingtone = RT_UNKNOWN;
     drawClock();   /* safe: we are on core 1 */
 }
 
@@ -145,6 +147,8 @@ void snoozeAlarm(int minutes) {
     next_alarm      = now + (time_t)(minutes * 60);
     next_alarm_type = firingRingtone;
     next_alarm_id   = firingAlarmId;
+    firingAlarmId.clear();
+    firingRingtone = RT_UNKNOWN;
 
     struct tm ti;
     localtime_r(&next_alarm, &ti);
@@ -167,15 +171,21 @@ static bool drainCommandQueue() {
         anyProcessed = true;
         switch (cmd.type) {
             case CMD_STOP:
-                if (isRinging) stopAlarm();
+                stopAlarm();
                 break;
             case CMD_SNOOZE:
-                if (isRinging) snoozeAlarm(cmd.minutes);
+                snoozeAlarm(cmd.minutes);
                 break;
             case CMD_SYNC_PUSH:
                 /* Alarm list was updated by the BLE task; recalculate. */
                 setNextAlarm();
                 drawClock();
+                break;
+            case CMD_BLE_CONNECTED:
+                show("BLE", "CONNECTED");
+                break;
+            case CMD_BLE_DISCONNECTED:
+                show("BLE", "DISCONNECTED");
                 break;
             default:
                 break;
@@ -208,27 +218,20 @@ void loop() {
 
     time_t now = start_time + (time_t)(millis() / 1000);
 
-    /* Ringing loop — playAlarm() is blocking (~1-3 s per melody cycle).
-       The BLE task posts CMD_STOP / CMD_SNOOZE; drainCommandQueue() at the
-       top of the next iteration will execute them. */
-    if (isRinging) {
-        playAlarm();
-        return;
-    }
-
-    /* Per-minute update. */
+    /* Refresh the clock independently of alarm playback. */
     if (now / 60 != last_update / 60) {
         drawClock();
-
-        if (next_alarm > 0 && now >= next_alarm) {
-            firingRingtone = next_alarm_type;
-            firingAlarmId  = next_alarm_id;
-            next_alarm     = 0;
-            startRinging();
-        }
-
         last_update = now;
     }
+
+    if (!isRinging && next_alarm > 0 && now >= next_alarm) {
+        firingRingtone = next_alarm_type;
+        firingAlarmId  = next_alarm_id;
+        next_alarm     = 0;
+        startRinging();
+    }
+
+    if (isRinging) playAlarm();
 
     delay(100);
 }

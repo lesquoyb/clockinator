@@ -110,6 +110,13 @@ object SyncPayload {
             put("ringtone", ringtone.wire)
         }.toString()
 
+    fun buildStopAlarm(): String =
+        JSONObject().apply {
+            put("action", ACTION_STOP_ALARM)
+            put("alarmId", "")
+            put("ringtone", "")
+        }.toString()
+
     // ------------------------------------------------------------------
     // Bidirectional: SNOOZE_ALARM
     // ------------------------------------------------------------------
@@ -119,6 +126,14 @@ object SyncPayload {
             put("action", ACTION_SNOOZE_ALARM)
             put("alarmId", alarmId)
             put("ringtone", ringtone.wire)
+            put("minutes", minutes)
+        }.toString()
+
+    fun buildSnoozeAlarm(minutes: Int): String =
+        JSONObject().apply {
+            put("action", ACTION_SNOOZE_ALARM)
+            put("alarmId", "")
+            put("ringtone", "")
             put("minutes", minutes)
         }.toString()
 

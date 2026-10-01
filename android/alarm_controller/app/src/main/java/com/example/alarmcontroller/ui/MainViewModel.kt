@@ -362,11 +362,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------
 
     fun stopPhoneAlarm() {
+        val id = AlarmRingtoneService.activeAlarmId
+        val slot = AlarmRingtoneService.activeRingtoneType
         AlarmRingtoneService.stopAlarm(getApplication())
+        sendStopToDevice(id, slot)
     }
 
     fun snoozePhoneAlarm(minutes: Int = 10) {
+        val id = AlarmRingtoneService.activeAlarmId
+        val slot = AlarmRingtoneService.activeRingtoneType
         AlarmRingtoneService.snoozeAlarm(getApplication(), minutes)
+        sendSnoozeToDevice(id, slot, minutes)
         _statusAlert.value = "Alarm snoozed for $minutes minutes."
     }
 
@@ -390,17 +396,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (phoneShouldStop) AlarmRingtoneService.stopAlarm(getApplication())
 
         // Stop ESP side
-        viewModelScope.launch {
-            val result = activeCommunicator.sendMessage(SyncPayload.buildStopAlarm(alarmId, ringtone))
-            if (result.isSuccess) {
-                _messages.update { it + DeviceMessage(
-                    text = "[CMD] Stop [${ringtone.wire}] for $alarmId sent.",
-                    direction = MessageDirection.TX
-                )}
-            } else {
-                _statusAlert.value = "Failed to send stop: ${result.exceptionOrNull()?.message}"
-            }
-        }
+        sendStopToDevice(alarmId, ringtone)
     }
 
     /**
@@ -411,26 +407,70 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 AlarmRingtoneService.activeRingtoneType == ringtone
         if (phoneShouldSnooze) AlarmRingtoneService.snoozeAlarm(getApplication(), minutes)
 
+        sendSnoozeToDevice(alarmId, ringtone, minutes)
+    }
+
+    private fun sendStopToDevice(alarmId: String?, ringtone: RingtoneType?) {
+        val payload = if (alarmId != null && ringtone != null) {
+            SyncPayload.buildStopAlarm(alarmId, ringtone)
+        } else {
+            SyncPayload.buildStopAlarm()
+        }
         viewModelScope.launch {
-            activeCommunicator.sendMessage(SyncPayload.buildSnoozeAlarm(alarmId, ringtone, minutes))
-            _messages.update { it + DeviceMessage(
-                text = "[CMD] Snooze ${minutes}min [${ringtone.wire}] for $alarmId sent.",
-                direction = MessageDirection.TX
-            )}
+            val result = activeCommunicator.sendMessage(payload)
+            if (result.isSuccess) {
+                _messages.update { it + DeviceMessage(
+                    text = if (alarmId != null && ringtone != null)
+                        "[CMD] Stop [${ringtone.wire}] for $alarmId sent."
+                    else "[CMD] Stop any active device alarm sent.",
+                    direction = MessageDirection.TX
+                )}
+            } else {
+                _statusAlert.value = "Failed to send stop: ${result.exceptionOrNull()?.message}"
+            }
+        }
+    }
+
+    private fun sendSnoozeToDevice(alarmId: String?, ringtone: RingtoneType?, minutes: Int) {
+        val payload = if (alarmId != null && ringtone != null) {
+            SyncPayload.buildSnoozeAlarm(alarmId, ringtone, minutes)
+        } else {
+            SyncPayload.buildSnoozeAlarm(minutes)
+        }
+        viewModelScope.launch {
+            val result = activeCommunicator.sendMessage(payload)
+            if (result.isFailure) {
+                _statusAlert.value = "Failed to send snooze: ${result.exceptionOrNull()?.message}"
+            } else {
+                _messages.update { it + DeviceMessage(
+                    text = "[CMD] Snooze ${minutes}min sent to device.",
+                    direction = MessageDirection.TX
+                )}
+            }
         }
     }
 
     // Convenience overloads that act on whatever is currently ringing
     fun stopCurrentAlarm() {
-        val id      = AlarmRingtoneService.activeAlarmId       ?: return
-        val slot    = AlarmRingtoneService.activeRingtoneType  ?: return
-        stopAlarm(id, slot)
+        val id = AlarmRingtoneService.activeAlarmId
+        val slot = AlarmRingtoneService.activeRingtoneType
+        if (id != null && slot != null) {
+            stopAlarm(id, slot)
+        } else {
+            if (isPhoneAlarmRinging.value) AlarmRingtoneService.stopAlarm(getApplication())
+            sendStopToDevice(null, null)
+        }
     }
 
     fun snoozeCurrentAlarm(minutes: Int) {
-        val id   = AlarmRingtoneService.activeAlarmId       ?: return
-        val slot = AlarmRingtoneService.activeRingtoneType  ?: return
-        snoozeAlarm(id, slot, minutes)
+        val id = AlarmRingtoneService.activeAlarmId
+        val slot = AlarmRingtoneService.activeRingtoneType
+        if (id != null && slot != null) {
+            snoozeAlarm(id, slot, minutes)
+        } else {
+            if (isPhoneAlarmRinging.value) AlarmRingtoneService.snoozeAlarm(getApplication(), minutes)
+            sendSnoozeToDevice(null, null, minutes)
+        }
     }
 
     /**

@@ -32,7 +32,12 @@ enum class RingtoneType(val wire: String) {
     WAKEUP("wakeup");
 
     companion object {
-        fun fromWire(s: String?): RingtoneType? = entries.firstOrNull { it.wire == s }
+        fun fromWire(s: String?): RingtoneType? = when (s) {
+            "lock", "lock_phone" -> LOCK_PHONE
+            "bed", "bedtime" -> BEDTIME
+            "wake", "wakeup" -> WAKEUP
+            else -> null
+        }
     }
 }
 

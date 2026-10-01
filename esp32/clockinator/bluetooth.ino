@@ -179,13 +179,13 @@ static void parseAndStoreAlarm(JsonObject obj) {
 
     /* Three-slot model */
     if (obj.containsKey("lock")) {
-        a.lockPhone = parseSlot(obj["lock"].as<JsonObject>());
+        a.lockPhone = parseSlot(obj["lock"].as<JsonObject>(), RT_LOCK_PHONE);
     }
     if (obj.containsKey("bed")){
-        a.bedtime   = parseSlot(obj["bed"].as<JsonObject>());
+        a.bedtime   = parseSlot(obj["bed"].as<JsonObject>(), RT_BEDTIME);
     }
     if (obj.containsKey("wake")){
-        a.wakeup    = parseSlot(obj["wake"].as<JsonObject>());
+        a.wakeup    = parseSlot(obj["wake"].as<JsonObject>(), RT_WAKEUP);
     } 
 
     /* Dismissed set */
@@ -216,13 +216,13 @@ class RXCallbacks : public BLECharacteristicCallbacks {
         /* Legacy plain-text snooze from very old firmware */
         if (raw.startsWith("SNOOZE:")) {
             int min = raw.substring(7).toInt();
-            snoozeAlarm((min > 0) ? min : 10);
+            isRinging = false;
+            postCommand(CMD_SNOOZE, (min > 0) ? min : 10);
             return;
         }
 
         JsonDocument doc;
         if (deserializeJson(doc, raw) != DeserializationError::Ok) {
-            show("BLE", "Bad JSON");
             return;
         }
 
@@ -240,7 +240,7 @@ class RXCallbacks : public BLECharacteristicCallbacks {
             alarms.clear();
             for (JsonObject obj : doc["alarms"].as<JsonArray>())
                 parseAndStoreAlarm(obj);
-            setNextAlarm();
+            postCommand(CMD_SYNC_PUSH);
             return;
         }
 
@@ -254,8 +254,9 @@ class RXCallbacks : public BLECharacteristicCallbacks {
             bool matches = (strlen(alarmId) == 0) ||
                            (firingAlarmId == std::string(alarmId) &&
                             (rt == RT_UNKNOWN || rt == firingRingtone));
-            if (matches && isRinging) {
-                stopAlarm();
+            if (matches) {
+                isRinging = false;
+                postCommand(CMD_STOP);
             }
             return;
         }
@@ -269,8 +270,9 @@ class RXCallbacks : public BLECharacteristicCallbacks {
             bool matches = (strlen(alarmId) == 0) ||
                            (firingAlarmId == std::string(alarmId) &&
                             (rt == RT_UNKNOWN || rt == firingRingtone));
-            if (matches && isRinging) {
-                snoozeAlarm(minutes);
+            if (matches) {
+                isRinging = false;
+                postCommand(CMD_SNOOZE, minutes);
             }
             return;
         }
@@ -285,7 +287,7 @@ class RXCallbacks : public BLECharacteristicCallbacks {
                 auto it = alarms.find(std::string(alarmId));
                 if (it != alarms.end()) {
                     it->second.setDismissed(rt, dismissed);
-                    setNextAlarm(); /* recalculate in case it affects the schedule */
+                    postCommand(CMD_SYNC_PUSH);
                 }
             }
             return;
@@ -374,9 +376,9 @@ class RXCallbacks : public BLECharacteristicCallbacks {
  * BLE server callbacks
  * -------------------------------------------------------------------------*/
 class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer*)    override { show("BLE", "CONNECTED"); }
+    void onConnect(BLEServer*)    override { postCommand(CMD_BLE_CONNECTED); }
     void onDisconnect(BLEServer*) override {
-        show("BLE", "DISCONNECTED");
+        postCommand(CMD_BLE_DISCONNECTED);
         BLEDevice::startAdvertising();
     }
 };

@@ -28,25 +28,25 @@
  * Mirrors the Android RingtoneType enum. Wire strings must match exactly.
  * -------------------------------------------------------------------------*/
 enum RingtoneType {
-    RT_LOCK_PHONE = 0,  // "lock"
-    RT_BEDTIME    = 1,  // "bed"
-    RT_WAKEUP     = 2,  // "wake"
+    RT_LOCK_PHONE = 0,  // "lock_phone"
+    RT_BEDTIME    = 1,  // "bedtime"
+    RT_WAKEUP     = 2,  // "wakeup"
     RT_UNKNOWN    = 3
 };
 
 static inline RingtoneType ringtoneFromWire(const char* s) {
     if (!s) return RT_UNKNOWN;
-    if (strcmp(s, "lock") == 0) return RT_LOCK_PHONE;
-    if (strcmp(s, "bed")  == 0) return RT_BEDTIME;
-    if (strcmp(s, "wake") == 0) return RT_WAKEUP;
+    if (strcmp(s, "lock") == 0 || strcmp(s, "lock_phone") == 0) return RT_LOCK_PHONE;
+    if (strcmp(s, "bed")  == 0 || strcmp(s, "bedtime") == 0) return RT_BEDTIME;
+    if (strcmp(s, "wake") == 0 || strcmp(s, "wakeup") == 0) return RT_WAKEUP;
     return RT_UNKNOWN;
 }
 
 static inline const char* ringtoneToWire(RingtoneType t) {
     switch (t) {
-        case RT_LOCK_PHONE: return "lock";
-        case RT_BEDTIME:    return "bed";
-        case RT_WAKEUP:     return "wake";
+        case RT_LOCK_PHONE: return "lock_phone";
+        case RT_BEDTIME:    return "bedtime";
+        case RT_WAKEUP:     return "wakeup";
         default:            return "unknown";
     }
 }
@@ -148,7 +148,9 @@ enum PendingCommandType {
     CMD_NONE,
     CMD_STOP,
     CMD_SNOOZE,
-    CMD_SYNC_PUSH   /* alarm list was updated; recalculate next trigger */
+    CMD_SYNC_PUSH,  /* alarm list was updated; recalculate next trigger */
+    CMD_BLE_CONNECTED,
+    CMD_BLE_DISCONNECTED
 };
 
 struct PendingCommand {
