@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -64,6 +65,18 @@ fun MainScreen(
     val showFocusOnboard by viewModel.showFocusOnboarding.collectAsState()
 
     val isConnected = connectionState is ConnectionState.Connected
+    val connectionLabel = when (connectionState) {
+        is ConnectionState.Connected -> "Connected · ${(connectionState as ConnectionState.Connected).deviceName}"
+        is ConnectionState.Connecting -> "Connecting"
+        is ConnectionState.Error -> "Connection error"
+        ConnectionState.Disconnected -> "Disconnected"
+    }
+    val connectionColor = when (connectionState) {
+        is ConnectionState.Connected -> StatusConnected
+        is ConnectionState.Connecting -> StatusConnecting
+        is ConnectionState.Error -> StatusDisconnected
+        ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
+    }
     var selectedTab  by remember { mutableIntStateOf(0) }
     var showAlarmDialog by remember { mutableStateOf(false) }
     var editingAlarm    by remember { mutableStateOf<AlarmItem?>(null) }
@@ -89,31 +102,35 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Clockinator", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            if (isLocked) StatusBadge("🔒 LOCK", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-                            if (hasPendingSync) StatusBadge("⏳ SYNC", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Clockinator", style = MaterialTheme.typography.titleLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(connectionColor))
+                            Text(connectionLabel, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
-                        val stateText = when (connectionState) {
-                            is ConnectionState.Connected  -> "Connected · ${(connectionState as ConnectionState.Connected).deviceName}"
-                            is ConnectionState.Connecting -> "Connecting…"
-                            is ConnectionState.Error      -> "Connection error"
-                            ConnectionState.Disconnected  -> "Disconnected"
-                        }
-                        Text(stateText, style = MaterialTheme.typography.bodySmall,
-                            color = if (isConnected) StatusConnected else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                actions = {
+                    if (isLocked) {
+                        Icon(Icons.Default.Lock, contentDescription = "Focus mode active",
+                            tint = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 8.dp))
+                    }
+                    if (hasPendingSync) {
+                        Icon(Icons.Default.Sync, contentDescription = "Alarm sync pending",
+                            tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 8.dp))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding)) {
 
             // Ringing banner, always visible on top regardless of tab
-            if (isPhoneRinging) {
+            AnimatedVisibility(visible = isPhoneRinging) {
                 RingingBanner(
+                    modifier        = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     title           = ringingTitle ?: "Alarm",
                     snoozeDurations = viewModel.currentSnoozeDurations(),
                     onStop          = { viewModel.stopPhoneAlarm() },
@@ -124,13 +141,13 @@ fun MainScreen(
             PrimaryTabRow(selectedTabIndex = selectedTab) {
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 },
                     text = { Text("Alarms (${alarms.size})") },
-                    icon = { Icon(Icons.Default.Alarm, null) })
+                    icon = { Icon(Icons.Default.Alarm, contentDescription = null) })
                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 },
                     text = { Text("Device") },
-                    icon = { Icon(Icons.Default.Bluetooth, null) })
+                    icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) })
                 Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 },
                     text = { Text("Settings") },
-                    icon = { Icon(Icons.Default.Settings, null) })
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) })
             }
 
             Box(Modifier.fillMaxSize()) {
@@ -203,38 +220,44 @@ fun MainScreen(
 
 @Composable
 fun RingingBanner(
+    modifier: Modifier = Modifier,
     title: String,
     snoozeDurations: List<Int>,
     onStop: () -> Unit,
     onSnooze: (Int) -> Unit
 ) {
     Card(
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        shape = RoundedCornerShape(0.dp), // full-width flush banner
-        modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.width(8.dp))
-                Text("⏰ $title", fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer)
+                Spacer(Modifier.width(10.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
             }
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = onStop,
                 colors  = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("STOP ALARM") }
-            Spacer(Modifier.height(6.dp))
+            ) {
+                Icon(Icons.Default.Stop, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Stop alarm")
+            }
+            Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Snooze:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Snooze", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
                     items(snoozeDurations.sorted()) { dur ->
                         OutlinedButton(
                             onClick = { onSnooze(dur) },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
-                        ) { Text("+${dur}m", fontSize = 11.sp) }
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) { Text("${dur} min") }
                     }
                 }
             }
@@ -255,29 +278,40 @@ fun AlarmsTab(
     onDismissNext: (AlarmItem, com.example.alarmcontroller.alarm.RingtoneType) -> Unit,
     onDelete: (AlarmItem) -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Your alarms", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Button(onClick = onAdd) {
-                Icon(Icons.Default.Add, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Add")
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Alarms", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = onAdd) {
+                Icon(Icons.Default.Add, contentDescription = "Add alarm")
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Text("${alarms.size} ${if (alarms.size == 1) "alarm" else "alarms"}",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
 
         if (alarms.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.AlarmOff, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
-                    Spacer(Modifier.height(8.dp))
-                    Text("No alarms yet", color = MaterialTheme.colorScheme.outline)
+                    Icon(Icons.Default.AlarmOff, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(12.dp))
+                    Text("No alarms yet", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(4.dp))
-                    TextButton(onClick = onAdd) { Text("Add your first alarm") }
+                    Text("Create an alarm to get started", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = onAdd) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add alarm")
+                    }
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)) {
                 items(alarms, key = { it.id }) { alarm ->
                     AlarmCard(alarm, onEdit = { onEdit(alarm) }, onToggle = { onToggle(alarm, it) },
                         onDismissNext = { rt -> onDismissNext(alarm, rt) }, onDelete = { onDelete(alarm) })
@@ -297,14 +331,14 @@ fun AlarmCard(
 ) {
     val anyDismissed = alarm.dismissedRingtones.isNotEmpty()
     Card(
-        shape  = RoundedCornerShape(16.dp),
+        shape  = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (!alarm.isEnabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                             else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (!alarm.isEnabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                             else MaterialTheme.colorScheme.surface
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().animateContentSize()
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
 
             // Title + global toggle
             Row(
@@ -313,17 +347,16 @@ fun AlarmCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(alarm.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text(alarm.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
                     if (alarm.ringtoneFile != null) {
-                        Text(alarm.ringtoneFile, fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.outline,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        Text("Device tone · ${alarm.ringtoneFile}", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                 }
                 Switch(checked = alarm.isEnabled, onCheckedChange = onToggle)
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
             // Three slot rows
             SlotRow(
@@ -335,6 +368,7 @@ fun AlarmCard(
                 enabled      = alarm.isEnabled,
                 onDismissToggle = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.LOCK_PHONE) }
             )
+            HorizontalDivider(Modifier.padding(vertical = 5.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             if (alarm.isBedtimeActive) {
                 SlotRow(
@@ -346,6 +380,7 @@ fun AlarmCard(
                     enabled      = alarm.isEnabled,
                     onDismissToggle = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.BEDTIME) }
                 )
+                HorizontalDivider(Modifier.padding(vertical = 5.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
 
             SlotRow(
@@ -358,7 +393,7 @@ fun AlarmCard(
                 onDismissToggle = { onDismissNext(com.example.alarmcontroller.alarm.RingtoneType.WAKEUP) }
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
 
             // Recurrence badge + edit/delete
             Row(
@@ -372,8 +407,8 @@ fun AlarmCard(
                     MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 Row {
-                    IconButton(onClick = onEdit)   { Icon(Icons.Default.Edit,   "Edit",   Modifier.size(20.dp)) }
-                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error) }
+                    IconButton(onClick = onEdit)   { Icon(Icons.Default.Edit,   "Edit alarm") }
+                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete alarm", tint = MaterialTheme.colorScheme.error) }
                 }
             }
         }
@@ -391,42 +426,48 @@ private fun SlotRow(
     onDismissToggle: () -> Unit
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Label + time
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                label,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.width(54.dp)
-            )
-            Text(
-                time,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-            )
-            // Ring-on badges
-            if (ringOnPhone)  PillBadge("P", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-            if (ringOnDevice) PillBadge("D", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    time,
+                    fontSize = 24.sp,
+                    lineHeight = 30.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                )
+                if (ringOnPhone) {
+                    Icon(Icons.Default.PhoneAndroid, "Rings on phone", Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary)
+                }
+                if (ringOnDevice) {
+                    Icon(Icons.Default.Devices, "Rings on connected device", Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.secondary)
+                }
+            }
         }
 
-        // Dismiss chip
         if (enabled) {
             if (dismissed) {
                 AssistChip(
                     onClick = onDismissToggle,
-                    label = { Text("Skipped", fontSize = 10.sp, color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = { Icon(Icons.Default.AlarmOff, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.error) }
+                    label = { Text("Skipped") },
+                    leadingIcon = { Icon(Icons.Default.AlarmOff, null, Modifier.size(18.dp)) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = MaterialTheme.colorScheme.error,
+                        leadingIconContentColor = MaterialTheme.colorScheme.error
+                    )
                 )
             } else {
                 AssistChip(
                     onClick = onDismissToggle,
-                    label = { Text("Skip once", fontSize = 10.sp) },
-                    leadingIcon = { Icon(Icons.Default.Alarm, null, Modifier.size(12.dp)) }
+                    label = { Text("Skip once") },
+                    leadingIcon = { Icon(Icons.Default.Alarm, null, Modifier.size(18.dp)) }
                 )
             }
         }
@@ -455,59 +496,74 @@ fun DeviceTab(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(Modifier.padding(top = 16.dp, bottom = 12.dp)) {
+            Text("Device", style = MaterialTheme.typography.headlineSmall)
+            Text("Connect and manage your Clockinator", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
         if (!hasPermissions) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Bluetooth permissions required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text("Bluetooth access needed", fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onErrorContainer)
                     }
                     TextButton(onClick = onRequestPerms) { Text("Grant") }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
         }
 
-        // Connection card
         ConnectionCard(connectionState, onDisconnect = { viewModel.disconnect() })
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // Scan section
         ScanSection(isScanning, isConnected, scannedDevices, { viewModel.startScan() }, { viewModel.stopScan() }, { viewModel.connectDevice(it) })
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // Remote commands
         if (isConnected) {
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Remote commands", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Remote controls", style = MaterialTheme.typography.titleSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { viewModel.stopCurrentAlarm() }, modifier = Modifier.weight(1f)) { Text("Stop", fontSize = 12.sp) }
-                        Button(onClick = { viewModel.pushSyncToDevice() }, modifier = Modifier.weight(1f)) { Text("Sync", fontSize = 12.sp) }
+                        OutlinedButton(onClick = { viewModel.stopCurrentAlarm() }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Stop")
+                        }
+                        Button(onClick = { viewModel.pushSyncToDevice() }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Sync, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Sync alarms")
+                        }
                     }
-                    // Remote snooze row
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Snooze remote:", fontSize = 11.sp, modifier = Modifier.align(Alignment.CenterVertically))
-                        listOf(5, 10, 30, 60).forEach { dur ->
-                            OutlinedButton(
-                                onClick = { viewModel.snoozeCurrentAlarm(dur) },
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                modifier = Modifier.weight(1f)
-                            ) { Text("+${dur}m", fontSize = 10.sp) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Snooze", style = MaterialTheme.typography.labelMedium)
+                        LazyRow(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(listOf(5, 10, 30, 60)) { duration ->
+                                AssistChip(onClick = { viewModel.snoozeCurrentAlarm(duration) },
+                                    label = { Text("${duration}m") })
+                            }
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
         }
 
-        // Message console
-        Text("Console (${messages.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Activity", style = MaterialTheme.typography.titleSmall)
+            Text("${messages.size} messages", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Card(
-            Modifier.fillMaxWidth().weight(1f).padding(vertical = 4.dp),
+            Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp, bottom = 4.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             if (messages.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -521,7 +577,7 @@ fun DeviceTab(
         }
 
         // Send bar
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = textToSend, onValueChange = { textToSend = it },
                 modifier = Modifier.weight(1f), placeholder = { Text("Send BLE command…") },
@@ -573,9 +629,14 @@ fun SettingsTab(
     }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        Column(Modifier.padding(top = 16.dp, bottom = 4.dp)) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall)
+            Text("Personalise alarms and your connected device", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
         // ── NFC Tags ─────────────────────────────────────────────────
         SettingsSection(title = "NFC Tags") {
@@ -684,10 +745,10 @@ fun SettingsTab(
             Text("Automatically push alarms to the device every N hours. If the device is unreachable the sync is queued and retried on next connection.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(0 to "Off", 1 to "1h", 2 to "2h", 6 to "6h", 12 to "12h", 24 to "24h").forEach { (h, label) ->
-                    FilterChip(selected = autoSyncHours == h, onClick = { viewModel.setAutoSyncHours(h) },
-                        label = { Text(label, fontSize = 11.sp) })
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(listOf(0 to "Off", 1 to "1h", 2 to "2h", 6 to "6h", 12 to "12h", 24 to "24h")) { (hours, label) ->
+                    FilterChip(selected = autoSyncHours == hours, onClick = { viewModel.setAutoSyncHours(hours) },
+                        label = { Text(label) })
                 }
             }
         }
@@ -743,12 +804,9 @@ fun FocusModeOnboardingSheet(
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Set up Focus Mode", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "When you scan the NFC tag at the start of your alarm, your phone enters focus mode.\n\n" +
-                "This prevents accidental social-media scrolling in case you need to come back to your phone.\n\n" +
-                "We can silence notifications automatically (Do Not Disturb). " +
-                "Focus Mode in Digital Wellbeing lets you choose which apps are paused in this mode. We recommend that " +
-                "you pick every social media and messaging app." +
-                "you can always tap 'Take a break' if you genuinely need them.",
+                "Scanning the NFC tag can silence notifications and pause the apps you choose.\n\n" +
+                "Allow Do Not Disturb access to silence notifications. Use Digital Wellbeing to choose which apps are paused. " +
+                "You can always take a break when you need access.",
                 style = MaterialTheme.typography.bodyMedium
             )
 
@@ -795,56 +853,65 @@ fun PillBadge(text: String, bg: Color, fg: Color) {
 
 @Composable
 fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            content()
-        }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(12.dp))
+        content()
+        HorizontalDivider(Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
 @Composable
 fun ConnectionCard(connectionState: ConnectionState, onDisconnect: () -> Unit) {
+    val isConnected = connectionState is ConnectionState.Connected
+    val accent = when (connectionState) {
+        is ConnectionState.Connected -> StatusConnected
+        is ConnectionState.Connecting -> StatusConnecting
+        is ConnectionState.Error -> StatusDisconnected
+        ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
+    }
     Card(
         Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = when (connectionState) {
-                is ConnectionState.Connected  -> StatusConnected.copy(alpha = 0.12f)
-                is ConnectionState.Connecting -> StatusConnecting.copy(alpha = 0.12f)
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (isConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
                     when (connectionState) {
-                        is ConnectionState.Connected  -> StatusConnected
-                        is ConnectionState.Connecting -> StatusConnecting
-                        is ConnectionState.Error      -> StatusDisconnected
-                        else -> Color.Gray
-                    }
-                ))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(
-                        when (connectionState) {
-                            is ConnectionState.Connected  -> "Connected: ${connectionState.deviceName}"
-                            is ConnectionState.Connecting -> "Connecting…"
-                            is ConnectionState.Error      -> "Error: ${connectionState.message}"
-                            ConnectionState.Disconnected  -> "Disconnected"
-                        },
-                        fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium
-                    )
-                    if (connectionState is ConnectionState.Connected) {
-                        Text(connectionState.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                    }
-                }
+                        is ConnectionState.Connected -> "Connected to ${connectionState.deviceName}"
+                        is ConnectionState.Connecting -> "Connecting to device"
+                        is ConnectionState.Error -> "Connection failed"
+                        ConnectionState.Disconnected -> "No device connected"
+                    },
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    when (connectionState) {
+                        is ConnectionState.Connected -> connectionState.address
+                        is ConnectionState.Connecting -> "Establishing Bluetooth connection…"
+                        is ConnectionState.Error -> connectionState.message
+                        ConnectionState.Disconnected -> "Scan nearby devices to connect"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (connectionState is ConnectionState.Error) accent
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            if (connectionState is ConnectionState.Connected) {
-                OutlinedButton(onClick = onDisconnect, colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusDisconnected)) {
-                    Text("Disconnect", fontSize = 12.sp)
+            if (isConnected) {
+                IconButton(onClick = onDisconnect) {
+                    Icon(Icons.Default.LinkOff, contentDescription = "Disconnect device", tint = accent)
                 }
             }
         }
@@ -859,42 +926,55 @@ fun ScanSection(
     var expanded by remember { mutableStateOf(!isConnected) }
 
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.AutoMirrored.Filled.BluetoothSearching, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(8.dp))
-                    Text("BLE scan (${devices.size})", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
-                }
-                Row {
-                    if (isScanning)
-                        Button(onClick = onStopScan, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Stop", fontSize = 12.sp) }
-                    else
-                        Button(onClick = { expanded = true; onStartScan() }) { Text("Scan", fontSize = 12.sp) }
-                    IconButton(onClick = { expanded = !expanded }) {
-                        Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Nearby devices", style = MaterialTheme.typography.titleSmall)
+                        Text("${devices.size} found", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Hide nearby devices" else "Show nearby devices")
                 }
             }
             AnimatedVisibility(expanded) {
                 Column(Modifier.padding(top = 8.dp)) {
+                    if (isScanning) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(8.dp))
+                    }
                     if (devices.isEmpty()) {
-                        Text(if (isScanning) "Scanning…" else "No devices found. Tap Scan.",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        Text(if (isScanning) "Searching for nearby devices…" else "Start a scan to find your device.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
-                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 200.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(devices.sortedBy { deviceItem -> deviceItem.rssi }, key = { it.address }) { device ->
+                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 200.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(devices.sortedByDescending { deviceItem -> deviceItem.rssi }, key = { it.address }) { device ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text(device.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                        Text("${device.address}  •  ${device.rssi} dBm", fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.outline, fontFamily = FontFamily.Monospace)
+                                        Text("${device.address} · ${device.rssi} dBm", style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
                                     }
                                     OutlinedButton(onClick = { onConnect(device.address) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
-                                        Text("Connect", fontSize = 12.sp)
+                                        Text("Connect")
                                     }
                                 }
                             }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (isScanning) {
+                        OutlinedButton(onClick = onStopScan, modifier = Modifier.fillMaxWidth()) { Text("Stop scan") }
+                    } else {
+                        Button(onClick = { onStartScan(); expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Scan for devices")
                         }
                     }
                 }
@@ -911,8 +991,9 @@ fun MessageRow(msg: DeviceMessage) {
             color = if (isTx) TxBadgeColor.copy(alpha = 0.18f) else RxBadgeColor.copy(alpha = 0.18f),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Text(msg.text, Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                fontSize = 11.sp, fontFamily = FontFamily.Monospace,
+            Text(msg.text, Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp,
                 color = if (isTx) TxBadgeColor else RxBadgeColor)
         }
     }

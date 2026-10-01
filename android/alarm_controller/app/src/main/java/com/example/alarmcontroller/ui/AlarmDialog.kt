@@ -4,6 +4,8 @@ import android.app.TimePickerDialog
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import com.example.alarmcontroller.alarm.AlarmItem
 import com.example.alarmcontroller.alarm.Recurrence
 import com.example.alarmcontroller.alarm.RingtoneSlot
@@ -108,6 +111,8 @@ fun AlarmDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).widthIn(max = 560.dp).heightIn(max = 840.dp),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
@@ -184,22 +189,28 @@ fun AlarmDialog(
 
                 // ── Recurrence ────────────────────────────────────────
                 SectionLabel("Recurrence")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = recMode == "daily",    onClick = { recMode = "daily" },    label = { Text("Daily") })
-                    FilterChip(selected = recMode == "weekly",   onClick = { recMode = "weekly" },   label = { Text("Weekly") })
-                    FilterChip(selected = recMode == "interval", onClick = { recMode = "interval" }, label = { Text("Every N days") })
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf("daily", "weekly", "interval")) { mode ->
+                        FilterChip(
+                            selected = recMode == mode,
+                            onClick = { recMode = mode },
+                            label = { Text(when (mode) {
+                                "daily" -> "Daily"
+                                "weekly" -> "Weekly"
+                                else -> "Every N days"
+                            }) }
+                        )
+                    }
                 }
                 if (recMode == "weekly") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { idx, lbl ->
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(listOf("M", "Tu", "W", "Th", "F", "Sa", "Su").mapIndexed { index, label -> index + 1 to label }) { (day, label) ->
                             FilterChip(
-                                selected = idx + 1 in selectedDays,
+                                selected = day in selectedDays,
                                 onClick  = {
-                                    val d = idx + 1
-                                    selectedDays = if (d in selectedDays) selectedDays - d else selectedDays + d
+                                    selectedDays = if (day in selectedDays) selectedDays - day else selectedDays + day
                                 },
-                                label    = { Text(lbl) },
-                                modifier = Modifier.weight(1f)
+                                label    = { Text(label) }
                             )
                         }
                     }
@@ -231,8 +242,8 @@ fun AlarmDialog(
 
                 // ── Snooze durations ──────────────────────────────────
                 SectionLabel("Snooze durations (min)")
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    snoozeDurations.sorted().forEach { dur ->
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(snoozeDurations.sorted()) { dur ->
                         InputChip(
                             selected = false, onClick = {},
                             label = { Text("${dur}m") },
@@ -384,22 +395,8 @@ private fun SlotSection(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    FilledTonalButton(
-                        onClick = {
-                            TimePickerDialog(
-                                context,
-                                { _, selectedHour, selectedMinute ->
-                                    onTimeChange(selectedHour, selectedMinute)
-                                },
-                                hour,
-                                minute,
-                                DateFormat.is24HourFormat(context)
-                            ).show()
-                        },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("Pick time", fontSize = 12.sp)
-                    }
+                    Text("Change", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary)
                 }
             }
 
