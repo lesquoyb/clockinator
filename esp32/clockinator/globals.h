@@ -121,15 +121,16 @@ struct Alarm {
 /* -------------------------------------------------------------------------
  * Global state  (defined in clockinator.ino)
  * -------------------------------------------------------------------------*/
-extern time_t                        start_time;
-extern time_t                        next_alarm;
-extern RingtoneType                  next_alarm_type;
-extern std::string                   next_alarm_id;
-extern std::map<std::string, Alarm>  alarms;
-extern volatile bool                 isRinging;
-extern volatile RingtoneType         firingRingtone;
-extern std::string                   firingAlarmId;
-extern const char*                   activeRingtoneFile;
+extern time_t                           start_time;
+extern time_t                           next_alarm;
+extern RingtoneType                     next_alarm_type;
+extern std::string                      next_alarm_id;
+extern std::map<std::string, Alarm>     alarms;
+extern volatile bool                    isRinging;
+extern volatile RingtoneType            firingRingtone;
+extern std::string                      firingAlarmId;
+extern const char*                      activeRingtoneFile;
+extern bool                             is_client_connected;
 
 /* -------------------------------------------------------------------------
  * Cross-core command queue

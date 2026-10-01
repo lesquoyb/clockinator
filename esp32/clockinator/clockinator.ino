@@ -39,10 +39,11 @@ void postCommand(PendingCommandType type, int minutes) {
 /* -------------------------------------------------------------------------
  * Global state definitions  (extern declarations live in globals.h)
  * -------------------------------------------------------------------------*/
-time_t       start_time       = 0;
-time_t       next_alarm       = 0;
-RingtoneType next_alarm_type  = RT_UNKNOWN;
-std::string  next_alarm_id;
+time_t          start_time          = 0;
+time_t          next_alarm          = 0;
+RingtoneType    next_alarm_type     = RT_UNKNOWN;
+std::string     next_alarm_id;
+bool            is_client_connected = false;
 
 std::map<std::string, Alarm> alarms;
 
@@ -182,10 +183,12 @@ static bool drainCommandQueue() {
                 drawClock();
                 break;
             case CMD_BLE_CONNECTED:
-                show("BLE", "CONNECTED");
+                is_client_connected = true;
+                drawClock();
                 break;
             case CMD_BLE_DISCONNECTED:
-                show("BLE", "DISCONNECTED");
+                is_client_connected = false;
+                drawClock();
                 break;
             default:
                 break;
