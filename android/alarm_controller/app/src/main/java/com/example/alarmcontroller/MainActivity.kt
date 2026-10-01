@@ -10,6 +10,7 @@ import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -34,6 +35,19 @@ class MainActivity : ComponentActivity() {
 
     // Tracks whether the app is currently in write-tag mode (set from NfcTagConfigScreen)
     var nfcWriteMode: String? = null  // "ODODO" | "OBOULO" | null
+
+    fun beginNfcTagWrite(payload: String) {
+        if (nfcAdapter == null) {
+            Toast.makeText(this, "NFC is not available on this device.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (nfcAdapter?.isEnabled != true) {
+            Toast.makeText(this, "Enable NFC, then tap Write again.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        nfcWriteMode = payload
+        Toast.makeText(this, "Ready to write $payload. Present an NFC tag.", Toast.LENGTH_LONG).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,10 +128,12 @@ class MainActivity : ComponentActivity() {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
             }
-            if (tag != null) {
-                viewModel.writeNfcTag(tag, writePayload)
+            if (tag == null) {
+                Toast.makeText(this, "Could not read the NFC tag. Try again.", Toast.LENGTH_SHORT).show()
+                return
             }
             nfcWriteMode = null
+            viewModel.writeNfcTag(tag, writePayload)
         } else {
             // Normal mode: read and dispatch
             val tagPayload = readNdefTextPayload(intent)

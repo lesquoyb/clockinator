@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.alarmcontroller.MainActivity
 import com.example.alarmcontroller.alarm.AlarmItem
 import com.example.alarmcontroller.alarm.nfc.NfcActionHandler
 import com.example.alarmcontroller.communication.ConnectionState
@@ -154,7 +155,10 @@ fun MainScreen(
                     )
                     2 -> SettingsTab(
                         viewModel   = viewModel,
-                        isConnected = isConnected
+                        isConnected = isConnected,
+                        onWriteNfcTag = { payload ->
+                            (context as? MainActivity)?.beginNfcTagWrite(payload)
+                        }
                     )
                 }
             }
@@ -545,7 +549,11 @@ fun DeviceTab(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-fun SettingsTab(viewModel: MainViewModel, isConnected: Boolean) {
+fun SettingsTab(
+    viewModel: MainViewModel,
+    isConnected: Boolean,
+    onWriteNfcTag: (String) -> Unit
+) {
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
     val uploadedRingtones by viewModel.uploadedRingtones.collectAsState()
     val uploadState       by viewModel.uploadState.collectAsState()
@@ -582,14 +590,14 @@ fun SettingsTab(viewModel: MainViewModel, isConnected: Boolean) {
                 label       = "ODODO tag",
                 description = "Stops the bedtime alarm & activates focus mode.",
                 payload     = NfcActionHandler.TAG_PAYLOAD_ODODO,
-                onWrite     = { /* MainActivity.nfcWriteMode set from parent. See NfcTagWriteButton */ }
+                onWrite     = { onWriteNfcTag(NfcActionHandler.TAG_PAYLOAD_ODODO) }
             )
             Spacer(Modifier.height(6.dp))
             NfcTagConfigRow(
                 label       = "OBOULO tag",
                 description = "Stops the wake-up alarm & releases focus mode",
                 payload     = NfcActionHandler.TAG_PAYLOAD_OBOULO,
-                onWrite     = { }
+                onWrite     = { onWriteNfcTag(NfcActionHandler.TAG_PAYLOAD_OBOULO) }
             )
             Spacer(Modifier.height(8.dp))
             Text(

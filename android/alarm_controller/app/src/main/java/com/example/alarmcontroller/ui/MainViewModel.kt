@@ -624,10 +624,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun writeNfcTag(tag: android.nfc.Tag, payload: String) {
         viewModelScope.launch {
             val result = com.example.alarmcontroller.alarm.nfc.NfcWriteManager.write(tag, payload)
-            _statusAlert.value = if (result.isSuccess)
+            _nfcToastMessages.trySend(if (result.isSuccess)
                 "Tag written: '$payload'."
-            else
-                "Write failed: ${result.exceptionOrNull()?.message}"
+            else "Write failed: ${result.exceptionOrNull()?.message}")
         }
     }
 
