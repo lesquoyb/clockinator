@@ -7,9 +7,9 @@
 
 /*
  * bluetooth.ino
- * BLE server: receives commands from the phone and notifies back.
+ * BLE server and shared command parser for BLE and local TCP messages.
  *
- * Phone -> ESP  (Write characteristic):
+ * Phone -> ESP  (BLE write or TCP line):
  *   SYNC, STOP_ALARM, SNOOZE_ALARM, DISMISS_NEXT, PUSH_RINGTONE,
  *   UPLOAD_BEGIN, UPLOAD_CHUNK, UPLOAD_END, DELETE_RINGTONE
  *
@@ -36,14 +36,18 @@ static const char* A_UPLOAD_BEGIN     = "UPLOAD_BEGIN";
 static const char* A_UPLOAD_CHUNK     = "UPLOAD_CHUNK";
 static const char* A_UPLOAD_END       = "UPLOAD_END";
 static const char* A_DELETE_RINGTONE  = "DELETE_RINGTONE";
+static const char* A_WIFI_CONFIG      = "WIFI_CONFIG";
 
 /* -------------------------------------------------------------------------
- * notifyPhone  - send a JSON string to the phone via BLE Notify
+ * notifyPhone  - send a message to the phone over BLE and TCP
+ * BLE invokes this on its task; TCP invokes it from the main loop. 
  * -------------------------------------------------------------------------*/
 void notifyPhone(const char* json) {
-    if (!txCharacteristic) return;
-    txCharacteristic->setValue(json);
-    txCharacteristic->notify();
+    if (txCharacteristic) {
+        txCharacteristic->setValue(json);
+        txCharacteristic->notify();
+    }
+    notifyWifiClient(json);
 }
 
 /* -------------------------------------------------------------------------
@@ -206,11 +210,9 @@ static void parseAndStoreAlarm(JsonObject obj) {
 }
 
 /* -------------------------------------------------------------------------
- * BLE write callback  (runs on the BLE RTOS task, core 0)
+ * Shared command parser called by BLE callbacks and the TCP main loop.
  * -------------------------------------------------------------------------*/
-class RXCallbacks : public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic* ch) override {
-        String raw = ch->getValue();
+void processIncomingCommand(String raw) {
         if (raw.length() == 0) return;
 
         /* Legacy plain-text snooze from very old firmware */
@@ -235,12 +237,20 @@ class RXCallbacks : public BLECharacteristicCallbacks {
 
         const char* action = doc["action"] | "";
 
+        if (strcmp(action, A_WIFI_CONFIG) == 0) {
+            const char* ssid = doc["ssid"] | "";
+            const char* password = doc["password"] | "";
+            if (strlen(ssid) > 0) queueWifiCredentials(ssid, password);
+            return;
+        }
+
         /* ---- SYNC -------------------------------------------- */
         if (strcmp(action, A_SYNC) == 0 && doc.containsKey("alarms")) {
             alarms.clear();
             for (JsonObject obj : doc["alarms"].as<JsonArray>())
                 parseAndStoreAlarm(obj);
             postCommand(CMD_SYNC_PUSH);
+            notifyWifiStatus();
             return;
         }
 
@@ -369,6 +379,11 @@ class RXCallbacks : public BLECharacteristicCallbacks {
                 LittleFS.remove(String("/") + fname);
             return;
         }
+}
+
+class RXCallbacks : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* ch) override {
+        processIncomingCommand(ch->getValue());
     }
 };
 
@@ -376,7 +391,10 @@ class RXCallbacks : public BLECharacteristicCallbacks {
  * BLE server callbacks
  * -------------------------------------------------------------------------*/
 class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer*)    override { postCommand(CMD_BLE_CONNECTED); }
+    void onConnect(BLEServer*)    override {
+        postCommand(CMD_BLE_CONNECTED);
+        notifyWifiStatus();
+    }
     void onDisconnect(BLEServer*) override {
         postCommand(CMD_BLE_DISCONNECTED);
         BLEDevice::startAdvertising();

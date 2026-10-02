@@ -1,3 +1,4 @@
+2. Optionally configure Wi-Fi in the pairing screen or later in **Settings → Local Wi-Fi**. The phone's current network name can be filled in automatically; Android still requires the password to be entered.
 # Clockinator
 
 **A smart alarm clock synced with your phone, so you can leave your phone outside the bedroom.**
@@ -30,12 +31,15 @@ You can program tags from the app's settings. Tags already written with these va
 ## How it works
 
 - **Android is the source of truth** for routines and recurrence. Phone alarms are scheduled locally with `AlarmManager` and do not depend on an internet connection.
-- **The phone syncs routines over BLE** to the alarm clock. Active routines, time, timezone, recurrence, sound outputs, and skipped events are sent to the firmware.
+- **The phone synchronizes routines, time, alarm actions, and ringtone uploads** over Wi-Fi when connected, with BLE available for pairing and fallback.
+- **BLE remains available for pairing and fallback.** During setup, you can optionally enter a local Wi-Fi SSID and password; the app sends them to the ESP32 over BLE.
+- **When configured, the ESP32 joins the 2.4 GHz Wi-Fi network** and opens a TCP server on port `4210`. The app connects to its address announced over BLE and sends commands over Wi-Fi, falling back to BLE if TCP is unavailable. Both channels remain active.
+- **When configured, the ESP32 joins the Wi-Fi network** and opens a TCP server on port `4210`. Supported bands depend on the chip: classic ESP32 variants are generally 2.4 GHz only, while ESP32-C5 supports 2.4 and 5 GHz. The app connects to its address announced over BLE and falls back to BLE if TCP is unavailable.
 - **The ESP32 calculates and displays the next event**, then plays a built-in melody or a WAV file uploaded from the app. It can notify the phone when an alarm is stopped, snoozed, or skipped so both devices stay in sync.
 - **After the alarm clock restarts**, the phone sends routines again when BLE reconnects. The firmware keeps the routine list in RAM; it is not persisted to flash.
 - **Android Focus Mode** can enable Do Not Disturb and, when the required system permission is available, grayscale. Pausing individual apps is configured through Digital Wellbeing; Android does not let this app pause apps directly without device-management privileges.
 
-The project requires no account, server, or cloud service. Device communication and synchronization use Bluetooth Low Energy.
+The project requires no account, cloud service, or internet access. Wi-Fi communication requires the phone and ESP32 to be on the same local network, with client-to-client traffic allowed. The ESP32 stores Wi-Fi credentials in NVS; the app does not persist them. Wi-Fi provisioning and TCP commands are currently not encrypted or authenticated, so use a trusted local network.
 
 ## Hardware
 
@@ -82,9 +86,10 @@ The APK is written to `android/alarm_controller/app/build/outputs/apk/debug/app-
 On first launch:
 
 1. Grant Bluetooth access and enable Bluetooth if Android asks.
-2. Turn on the alarm clock and keep it nearby, then select it in setup.
-3. Create the first routine and choose its repeat days.
-4. To program tags, open **More settings → NFC Tags**, choose `ODODO` or `OBOULO`, then present a compatible tag when the phone says it is ready.
+2. Optionally configure Wi-Fi during pairing or later in **Settings → Local Wi-Fi**. The current network name can be filled in automatically; Android still requires the password to be entered.
+3. Turn on the alarm clock and keep it nearby, then select it in setup.
+4. Create the first routine and choose its repeat days.
+5. To program tags, open **More settings → NFC Tags**, choose `ODODO` or `OBOULO`, then present a compatible tag when the phone says it is ready.
 
 NFC support depends on the phone hardware. Do Not Disturb access must be granted separately in Android settings. Grayscale requires the `WRITE_SECURE_SETTINGS` system permission, which is not granted by default on a standard phone.
 
@@ -92,7 +97,7 @@ NFC support depends on the phone hardware. Do Not Disturb access must be granted
 
 The Arduino firmware is in `esp32/clockinator`. Open `clockinator.ino` with Arduino IDE, install ESP32 board support and the **ArduinoJson 7**, **GxEPD2**, and **Adafruit GFX Library** libraries, select a compatible ESP32 board, and upload the sketch.
 
-By default, the clock advertises over BLE as `ESP32-Bapresearch`. Change this name in `esp32/clockinator/bluetooth.ino`. The app uses the BLE service and characteristics defined in the same file. The protocol carries JSON messages for sync, stop, snooze, and skip actions, as well as audio-file data.
+By default, the clock advertises over BLE as `ESP32-Bapresearch`. Change this name in `esp32/clockinator/bluetooth.ino`. The app uses the BLE service and characteristics defined in the same file. The protocol carries JSON messages for sync, stop, snooze, skip, and optional Wi-Fi setup, as well as audio-file data. The Wi-Fi server uses TCP port `4210` and starts only after the ESP32 joins the configured network.
 
 Ringtone files uploaded to the clock must be PCM WAV, mono or stereo, 8- or 16-bit. The firmware stores them in LittleFS and plays them over I²S. A built-in melody is used when no file is assigned to a routine.
 
@@ -103,4 +108,4 @@ android/alarm_controller/   Android app (Kotlin / Jetpack Compose)
 esp32/clockinator/          ESP32 Arduino firmware
 ```
 
-The Android app owns recurrence calculations and local routine state. The ESP32 receives configuration over BLE, displays the current time and next event on e-paper, and handles audio playback in the bedroom.
+The Android app owns recurrence calculations and local routine state. The ESP32 receives configuration over BLE or local Wi-Fi, displays the current time and next event on e-paper, and handles audio playback in the bedroom.

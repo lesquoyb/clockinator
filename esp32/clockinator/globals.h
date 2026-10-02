@@ -130,7 +130,8 @@ extern volatile bool                    isRinging;
 extern volatile RingtoneType            firingRingtone;
 extern std::string                      firingAlarmId;
 extern const char*                      activeRingtoneFile;
-extern bool                             is_client_connected;
+extern bool                             is_bluetooth_connected;
+extern bool                             is_wifi_connected;
 
 /* -------------------------------------------------------------------------
  * Cross-core command queue
@@ -185,3 +186,11 @@ bool playWavFile(const char* path);
 /* bluetooth.ino */
 void initBluetoothServer();
 void notifyPhone(const char* json);
+void processIncomingCommand(String raw);
+
+/* clockinator.ino */
+void initWifi();
+void serviceWifi();
+void queueWifiCredentials(const char* ssid, const char* password);
+void notifyWifiClient(const char* message);
+void notifyWifiStatus();

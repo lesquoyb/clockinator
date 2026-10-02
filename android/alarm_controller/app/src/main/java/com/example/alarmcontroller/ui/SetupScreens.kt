@@ -1,4 +1,12 @@
 package com.example.alarmcontroller.ui
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.wifi.WifiManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +29,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,17 +37,27 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.alarmcontroller.communication.ConnectionState
 import com.example.alarmcontroller.communication.ble.BleDeviceItem
+import androidx.core.content.ContextCompat
 
 @Composable
 fun SetupDeviceScreen(
@@ -49,10 +68,12 @@ fun SetupDeviceScreen(
     onRequestPermissions: () -> Unit,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
-    onConnect: (String) -> Unit,
+    onConnect: (String, String, String) -> Unit,
     onContinue: () -> Unit
 ) {
     val isConnected = connectionState is ConnectionState.Connected
+    var wifiSsid by rememberSaveable { mutableStateOf("") }
+    var wifiPassword by remember { mutableStateOf("") }
 
     LaunchedEffect(hasPermissions) {
         if (hasPermissions && !isConnected) onStartScan()
@@ -68,6 +89,13 @@ fun SetupDeviceScreen(
         Text("Pair your Clockinator once. It will reconnect automatically when you open the app.",
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
+
+        WifiCredentialsFields(
+            ssid = wifiSsid,
+            onSsidChange = { wifiSsid = it },
+            password = wifiPassword,
+            onPasswordChange = { wifiPassword = it }
+        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -147,7 +175,9 @@ fun SetupDeviceScreen(
                             Text("${device.rssi} dBm", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        TextButton(onClick = { onConnect(device.address) }) { Text("Connect") }
+                        TextButton(onClick = { onConnect(device.address, wifiSsid.trim(), wifiPassword) }) {
+                            Text("Connect")
+                        }
                     }
                 }
             }
@@ -159,6 +189,124 @@ fun SetupDeviceScreen(
         }
         Spacer(Modifier.height(24.dp))
     }
+}
+
+@Composable
+fun WifiCredentialsFields(
+    ssid: String,
+    onSsidChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    showTitle: Boolean = true
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (showTitle) Text("Local Wi-Fi (optional)", style = MaterialTheme.typography.titleSmall)
+        CurrentWifiNetworkButton(onSsidChange)
+        OutlinedTextField(
+            value = ssid,
+            onValueChange = onSsidChange,
+            label = { Text("Network name (SSID)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (ssid.isNotBlank()) {
+            OutlinedTextField(
+                value = password,
+                onValueChange = onPasswordChange,
+                label = { Text("Wi-Fi password (if required)") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun CurrentWifiNetworkButton(onSsidFound: (String) -> Unit) {
+    val context = LocalContext.current
+    var message by remember { mutableStateOf<String?>(null) }
+    var isFrequencyWarning by remember { mutableStateOf(false) }
+    val requiredPermissions = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        val allGranted = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        val network = if (allGranted) readCurrentWifiNetwork(context) else null
+        showCurrentNetwork(network, onSsidFound) { text, warning ->
+            message = text
+            isFrequencyWarning = warning
+        }
+    }
+
+    OutlinedButton(
+        onClick = {
+            val missingPermissions = requiredPermissions.filter {
+                ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (missingPermissions.isEmpty()) {
+                val network = readCurrentWifiNetwork(context)
+                showCurrentNetwork(network, onSsidFound) { text, warning ->
+                    message = text
+                    isFrequencyWarning = warning
+                }
+            } else {
+                permissionLauncher.launch(missingPermissions.toTypedArray())
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Default.Wifi, contentDescription = null)
+        Spacer(Modifier.size(8.dp))
+        Text("Use phone's current Wi-Fi")
+    }
+    message?.let {
+        Text(
+            it,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isFrequencyWarning) MaterialTheme.colorScheme.tertiary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private data class CurrentWifiNetwork(val ssid: String, val frequencyMhz: Int)
+
+private fun showCurrentNetwork(
+    network: CurrentWifiNetwork?,
+    onSsidFound: (String) -> Unit,
+    onMessage: (String, Boolean) -> Unit
+) {
+    if (network == null) {
+        onMessage("Could not read the current Wi-Fi network. Check permissions or enter its name below.", false)
+        return
+    }
+    onSsidFound(network.ssid)
+    val is5Ghz = network.frequencyMhz >= 5_000
+    onMessage(
+        if (is5Ghz) "Phone is using 5 GHz. ESP32 band support depends on its model; many models support only 2.4 GHz."
+        else "Network name filled in. Android keeps the password private.",
+        is5Ghz
+    )
+}
+
+@SuppressLint("MissingPermission")
+@Suppress("DEPRECATION")
+private fun readCurrentWifiNetwork(context: Context): CurrentWifiNetwork? {
+    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        ?: return null
+    val wifiInfo = wifiManager.connectionInfo ?: return null
+    val ssid = wifiInfo.ssid?.removeSurrounding("\"")?.trim()
+        ?.takeIf { it.isNotBlank() && it != WifiManager.UNKNOWN_SSID }
+        ?: return null
+    return CurrentWifiNetwork(ssid, wifiInfo.frequency)
 }
 
 @Composable

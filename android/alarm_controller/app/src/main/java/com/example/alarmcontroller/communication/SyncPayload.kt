@@ -45,6 +45,8 @@ object SyncPayload {
     const val ACTION_UPLOAD_CHUNK     = "UPLOAD_CHUNK"
     const val ACTION_UPLOAD_END       = "UPLOAD_END"
     const val ACTION_DELETE_RINGTONE  = "DELETE_RINGTONE"
+    const val ACTION_WIFI_CONFIG      = "WIFI_CONFIG"
+    const val ACTION_WIFI_STATUS      = "WIFI_STATUS"
 
     // ACK strings sent from the ESP back to the phone
     const val ACK_CHUNK      = "CHUNK_ACK:"   // followed by chunk index
@@ -53,6 +55,13 @@ object SyncPayload {
 
     /** Raw bytes per chunk before base64 encoding. */
     const val CHUNK_SIZE_BYTES = 300
+
+    fun buildWifiConfig(ssid: String, password: String): String =
+        JSONObject().apply {
+            put("action", ACTION_WIFI_CONFIG)
+            put("ssid", ssid)
+            put("password", password)
+        }.toString()
 
     // ------------------------------------------------------------------
     // Phone -> ESP: full alarm sync

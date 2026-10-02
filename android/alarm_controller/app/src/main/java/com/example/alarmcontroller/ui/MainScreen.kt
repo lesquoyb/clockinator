@@ -59,11 +59,14 @@ fun MainScreen(
     onRequestPermissions: () -> Unit
 ) {
     val connectionState  by viewModel.connectionState.collectAsState()
+    val wifiConnectionState by viewModel.wifiConnectionState.collectAsState()
     val alarms           by viewModel.alarms.collectAsState()
     val hasPendingSync   by viewModel.hasPendingSync.collectAsState()
     val isPhoneRinging   by viewModel.isPhoneAlarmRinging.collectAsState()
     val ringingTitle     by viewModel.ringingAlarmTitle.collectAsState()
     val statusAlert      by viewModel.statusAlert.collectAsState()
+    val wifiError = (wifiConnectionState as? ConnectionState.Error)?.message
+    var dismissedWifiError by remember(wifiError) { mutableStateOf(false) }
 
     val isConnected = connectionState is ConnectionState.Connected
     val connectionLabel = when (connectionState) {
@@ -78,7 +81,18 @@ fun MainScreen(
         is ConnectionState.Error -> StatusDisconnected
         ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
     }
-    val deviceSummary = if (hasPendingSync) "$connectionLabel · Sync pending" else connectionLabel
+    val wifiConnectionColor = when (wifiConnectionState) {
+        is ConnectionState.Connected -> StatusConnected
+        is ConnectionState.Connecting -> StatusConnecting
+        is ConnectionState.Error -> StatusDisconnected
+        ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
+    }
+    val wifiConnectionLabel = when (wifiConnectionState) {
+        is ConnectionState.Connected -> "connected"
+        is ConnectionState.Connecting -> "connecting"
+        is ConnectionState.Error -> (wifiConnectionState as ConnectionState.Error).message
+        ConnectionState.Disconnected -> "disconnected"
+    }
     var currentPage by rememberSaveable {
         mutableStateOf(if (viewModel.isSetupRequired) "setup_device" else "home")
     }
@@ -146,10 +160,25 @@ fun MainScreen(
                         "setup_alarm" -> Text("Your first routine")
                         "home" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("Clockinator", style = MaterialTheme.typography.titleLarge)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Box(Modifier.size(8.dp).clip(CircleShape).background(connectionColor))
-                                Text(deviceSummary, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Box(Modifier.size(7.dp).clip(CircleShape).background(connectionColor))
+                                    Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth $connectionLabel",
+                                        modifier = Modifier.size(14.dp), tint = connectionColor)
+                                    Text("BT", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Box(Modifier.size(7.dp).clip(CircleShape).background(wifiConnectionColor))
+                                    Icon(Icons.Default.Wifi, contentDescription = "Wi-Fi $wifiConnectionLabel",
+                                        modifier = Modifier.size(14.dp), tint = wifiConnectionColor)
+                                    Text("Wi-Fi", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (hasPendingSync) {
+                                    Text("Sync pending", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                }
                             }
                         }
                         "settings" -> Text("More settings")
@@ -202,6 +231,29 @@ fun MainScreen(
                     onSnooze = { viewModel.snoozePhoneAlarm(it) }
                 )
             }
+            if (wifiError != null && !dismissedWifiError) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.WifiOff, contentDescription = null)
+                        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                            Text("ESP32 Wi-Fi connection failed", style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold)
+                            Text(wifiError, style = MaterialTheme.typography.bodySmall)
+                        }
+                        IconButton(onClick = { dismissedWifiError = true }) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss Wi-Fi error")
+                        }
+                    }
+                }
+            }
             Box(Modifier.fillMaxWidth().weight(1f)) {
             when (currentPage) {
                 "setup_device" -> SetupDeviceScreen(
@@ -212,7 +264,7 @@ fun MainScreen(
                     onRequestPermissions = onRequestPermissions,
                     onStartScan = { viewModel.startScan() },
                     onStopScan = { viewModel.stopScan() },
-                    onConnect = { viewModel.connectDevice(it) },
+                    onConnect = { address, ssid, password -> viewModel.connectDevice(address, ssid, password) },
                     onContinue = { viewModel.stopScan(); currentPage = "setup_alarm" }
                 )
                 "setup_alarm" -> SetupAlarmScreen(
@@ -762,6 +814,7 @@ fun SettingsTab(
     onWriteNfcTag: (String) -> Unit,
     onOpenDevice: () -> Unit
 ) {
+    val lastEspWifiIp by viewModel.lastEspWifiIp.collectAsState()
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
     val uploadedRingtones by viewModel.uploadedRingtones.collectAsState()
     val uploadState       by viewModel.uploadState.collectAsState()
@@ -794,6 +847,51 @@ fun SettingsTab(
             Text(if (isConnected) "Connected and syncing alarms" else "Not connected",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = onOpenDevice) { Text("Manage connection") }
+        }
+
+        val wifiConnectionState by viewModel.wifiConnectionState.collectAsState()
+        var wifiSsid by rememberSaveable { mutableStateOf("") }
+        var wifiPassword by rememberSaveable { mutableStateOf("") }
+        SettingsSection(title = "Local Wi-Fi") {
+            Text(
+                when (wifiConnectionState) {
+                    is ConnectionState.Connected -> "ESP32 reachable over Wi-Fi"
+                    is ConnectionState.Connecting -> "Connecting to ESP32 over Wi-Fi…"
+                    is ConnectionState.Error -> "Wi-Fi unavailable: ${(wifiConnectionState as ConnectionState.Error).message}"
+                    ConnectionState.Disconnected -> "Not connected over Wi-Fi; Bluetooth remains available"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            WifiCredentialsFields(
+                ssid = wifiSsid,
+                onSsidChange = { wifiSsid = it },
+                password = wifiPassword,
+                onPasswordChange = { wifiPassword = it },
+                showTitle = false
+            )
+            Button(
+                onClick = { viewModel.configureWifi(wifiSsid, wifiPassword) },
+                enabled = isConnected && wifiSsid.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Send Wi-Fi settings to clock")
+            }
+            OutlinedButton(
+                onClick = { viewModel.retryWifiConnection() },
+                enabled = lastEspWifiIp != null && wifiConnectionState !is ConnectionState.Connecting,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Retry Wi-Fi connection")
+            }
+            if (!isConnected) {
+                Text("Connect to the clock over Bluetooth before changing its Wi-Fi network.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         // ── NFC Tags ─────────────────────────────────────────────────

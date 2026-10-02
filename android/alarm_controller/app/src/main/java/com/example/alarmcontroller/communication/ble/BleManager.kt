@@ -271,7 +271,10 @@ class BleManager(private val context: Context) : DeviceCommunicator {
         }
 
         return if (success) {
-            _incomingMessages.tryEmit(DeviceMessage(text = message, direction = MessageDirection.TX))
+            val safeMessage = if (message.contains("\"action\":\"WIFI_CONFIG\""))
+                "Wi-Fi credentials sent to device."
+            else message
+            _incomingMessages.tryEmit(DeviceMessage(text = safeMessage, direction = MessageDirection.TX))
             Result.success(Unit)
         } else {
             Result.failure(Exception("Failed to send command"))

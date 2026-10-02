@@ -2,6 +2,10 @@ package com.example.alarmcontroller.ui
 
 import android.net.Uri
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.alarmcontroller.alarm.AlarmItem
@@ -13,12 +17,12 @@ import com.example.alarmcontroller.alarm.RingtoneSlot
 import com.example.alarmcontroller.alarm.RingtoneType
 import com.example.alarmcontroller.alarm.nfc.NfcActionHandler
 import com.example.alarmcontroller.communication.ConnectionState
-import com.example.alarmcontroller.communication.DeviceCommunicator
 import com.example.alarmcontroller.communication.DeviceMessage
 import com.example.alarmcontroller.communication.MessageDirection
 import com.example.alarmcontroller.communication.SyncPayload
 import com.example.alarmcontroller.communication.ble.BleDeviceItem
 import com.example.alarmcontroller.communication.ble.BleManager
+import com.example.alarmcontroller.communication.wifi.WifiCommunicator
 import com.example.alarmcontroller.lock.LockModeManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -39,7 +43,11 @@ enum class CommunicatorType { BLE, WIFI }
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val bleManager      = BleManager(application)
+    private val wifiCommunicator = WifiCommunicator(application)
+    private var pendingWifiCredentials: Pair<String, String>? = null
     private val alarmRepository = AlarmRepository(application)
+    private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)
+    private val _lastEspWifiIp = MutableStateFlow(alarmRepository.getLastEspWifiIp())
     private val alarmScheduler  = AlarmScheduler(application)
     private val nfcHandler      = NfcActionHandler(application)
 
@@ -62,12 +70,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun dndSettingsIntent()  = lockModeManager.dndSettingsIntent()
     fun focusModeIntent()    = lockModeManager.focusModeIntent()
 
-    private var activeCommunicator: DeviceCommunicator = bleManager
-
     val connectionState:  StateFlow<ConnectionState>     = bleManager.connectionState
     val scannedDevices:   StateFlow<List<BleDeviceItem>> = bleManager.scannedDevices
     val isScanning:       StateFlow<Boolean>             = bleManager.isScanning
     val isBluetoothEnabled: Boolean get() = bleManager.isBluetoothEnabled
+    val wifiConnectionState: StateFlow<ConnectionState> = wifiCommunicator.connectionState
+    val lastEspWifiIp: StateFlow<String?> = _lastEspWifiIp.asStateFlow()
+    private val autoWifiLock = Any()
+    private var lastAutoWifiNetwork: Network? = null
+    private var wifiNetworkCallback: ConnectivityManager.NetworkCallback? = null
 
     private val _messages = MutableStateFlow<List<DeviceMessage>>(emptyList())
     val messages: StateFlow<List<DeviceMessage>> = _messages.asStateFlow()
@@ -101,7 +112,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _uploadedRingtones = MutableStateFlow(alarmRepository.getUploadedRingtones())
     val uploadedRingtones: StateFlow<Set<String>> = _uploadedRingtones.asStateFlow()
 
-    // Internal channel: BLE ACK strings routed here from the message collector
+    // Transfer ACK strings from either transport are routed here.
     private val _bleAckFlow = MutableSharedFlow<String>(extraBufferCapacity = 32)
 
     // ------------------------------------------------------------------
@@ -131,12 +142,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        viewModelScope.launch {
+            wifiCommunicator.incomingMessages.collect { message ->
+                _messages.update { it + message }
+                if (message.direction == MessageDirection.RX) handleIncomingMessage(message.text.trim())
+            }
+        }
+
         // 2. On reconnect: flush pending sync
         viewModelScope.launch {
             bleManager.connectionState.collect { state ->
                 if (state is ConnectionState.Connected) {
                     alarmRepository.saveLastBleMac(state.address)
                     delay(1_000)
+                    pendingWifiCredentials?.let { (ssid, password) ->
+                        val result = bleManager.sendMessage(SyncPayload.buildWifiConfig(ssid, password))
+                        if (result.isSuccess) pendingWifiCredentials = null
+                        else _statusAlert.value = "Could not send Wi-Fi settings: ${result.exceptionOrNull()?.message}"
+                    }
                     pushSyncToDevice()
                     _hasPendingSync.value = false
                 }
@@ -152,13 +175,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        registerWifiReconnect()
+
         // 4. Periodic auto-sync
         viewModelScope.launch {
             while (true) {
                 val hours = _autoSyncHours.value
                 if (hours > 0) {
                     delay(hours * 3_600_000L)
-                    if (connectionState.value is ConnectionState.Connected) pushSyncToDevice()
+                    if (connectionState.value is ConnectionState.Connected ||
+                        wifiCommunicator.connectionState.value is ConnectionState.Connected) pushSyncToDevice()
                     else _hasPendingSync.value = true
                 } else {
                     delay(60_000L)
@@ -204,6 +230,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val ringtone = RingtoneType.fromWire(json.optString("ringtone"))
 
         when (action) {
+            SyncPayload.ACTION_WIFI_STATUS -> {
+                when (json.optString("status")) {
+                    "connecting" -> {
+                        val ssid = json.optString("ssid").ifBlank { "Wi-Fi network" }
+                        wifiCommunicator.reportConnecting("Joining $ssid")
+                    }
+                    "error" -> {
+                        val error = json.optString("error").ifBlank { "Unknown Wi-Fi connection error." }
+                        wifiCommunicator.reportError(error)
+                    }
+                    "connected" -> {
+                        val address = json.optString("ip").takeIf { it.isNotBlank() && it != "0.0.0.0" }
+                        if (address != null) {
+                            alarmRepository.saveLastEspWifiIp(address)
+                            _lastEspWifiIp.value = address
+                            val state = wifiCommunicator.connectionState.value
+                            if (state !is ConnectionState.Connected || state.address != address) {
+                                viewModelScope.launch {
+                                    val result = wifiCommunicator.connect(address)
+                                    if (result.isSuccess) pushSyncToDevice()
+                                }
+                            }
+                        }
+                    }
+                    "disconnected" -> wifiCommunicator.disconnect()
+                    else -> if (json.optBoolean("connected")) {
+                        val address = json.optString("ip").takeIf { it.isNotBlank() && it != "0.0.0.0" }
+                        if (address != null) {
+                            alarmRepository.saveLastEspWifiIp(address)
+                            _lastEspWifiIp.value = address
+                            viewModelScope.launch {
+                                val result = wifiCommunicator.connect(address)
+                                if (result.isSuccess) pushSyncToDevice()
+                            }
+                        }
+                    } else wifiCommunicator.disconnect()
+                }
+            }
             SyncPayload.ACTION_STOP_ALARM -> {
                 // ESP stopped its alarm; stop phone alarm if it's the same (alarmId, ringtone)
                 handleRemoteStop(alarmId, ringtone)
@@ -328,7 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Notify ESP so it also skips the slot
         viewModelScope.launch {
-            activeCommunicator.sendMessage(
+            sendToDevice(
                 SyncPayload.buildDismissNext(alarm.id, ringtone, newDismiss)
             )
         }
@@ -357,7 +421,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadAlarms()
         viewModelScope.launch {
             ringtoneTypes.forEach { type ->
-                activeCommunicator.sendMessage(
+                sendToDevice(
                     SyncPayload.buildDismissNext(alarm.id, type, dismissed = true)
                 )
             }
@@ -370,12 +434,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------
 
     fun pushSyncToDevice() {
-        if (connectionState.value !is ConnectionState.Connected) {
+        if (connectionState.value !is ConnectionState.Connected &&
+            wifiCommunicator.connectionState.value !is ConnectionState.Connected) {
             _hasPendingSync.value = true
             return
         }
         viewModelScope.launch {
-            val result = activeCommunicator.sendMessage(SyncPayload.buildPushSyncJson(_alarms.value))
+            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value))
             if (result.isSuccess) {
                 _hasPendingSync.value = false
                 _messages.update { it + DeviceMessage(
@@ -453,7 +518,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SyncPayload.buildStopAlarm()
         }
         viewModelScope.launch {
-            val result = activeCommunicator.sendMessage(payload)
+            val result = sendToDevice(payload)
             if (result.isSuccess) {
                 _messages.update { it + DeviceMessage(
                     text = if (alarmId != null && ringtone != null)
@@ -474,7 +539,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SyncPayload.buildSnoozeAlarm(minutes)
         }
         viewModelScope.launch {
-            val result = activeCommunicator.sendMessage(payload)
+            val result = sendToDevice(payload)
             if (result.isFailure) {
                 _statusAlert.value = "Failed to send snooze: ${result.exceptionOrNull()?.message}"
             } else {
@@ -519,7 +584,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
-            activeCommunicator.sendMessage(SyncPayload.buildPushRingtoneJson(alarm.id, ringtone))
+            sendToDevice(SyncPayload.buildPushRingtoneJson(alarm.id, ringtone))
             _messages.update { it + DeviceMessage(
                 text = "[CMD] Push ringtone [${ringtone.wire}] for '${alarm.title}' sent.",
                 direction = MessageDirection.TX
@@ -537,7 +602,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _nfcToastMessages.trySend(result.message)
                 // Mirror on ESP
                 viewModelScope.launch {
-                    activeCommunicator.sendMessage(
+                    sendToDevice(
                         SyncPayload.buildStopAlarm(result.alarmId, result.ringtone)
                     )
                 }
@@ -550,7 +615,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loadAlarms()
                 // Notify ESP
                 viewModelScope.launch {
-                    activeCommunicator.sendMessage(
+                    sendToDevice(
                         SyncPayload.buildDismissNext(result.alarmId, result.ringtone, result.dismissed)
                     )
                 }
@@ -587,7 +652,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val crc         = CRC32().apply { update(bytes) }.value
             val totalChunks = (bytes.size + SyncPayload.CHUNK_SIZE_BYTES - 1) / SyncPayload.CHUNK_SIZE_BYTES
 
-            activeCommunicator.sendMessage(SyncPayload.buildUploadBegin(filename, bytes.size))
+            sendToDevice(SyncPayload.buildUploadBegin(filename, bytes.size))
             delay(200)
 
             for (i in 0 until totalChunks) {
@@ -598,7 +663,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 var acked   = false
                 var retries = 0
                 while (!acked && retries < 3) {
-                    activeCommunicator.sendMessage(SyncPayload.buildUploadChunk(i, b64))
+                    sendToDevice(SyncPayload.buildUploadChunk(i, b64))
                     val ack = withTimeoutOrNull(5_000) {
                         var r: String? = null
                         _bleAckFlow.collect { raw ->
@@ -615,7 +680,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uploadState.value = UploadState.InProgress(filename, (i + 1f) / totalChunks)
             }
 
-            activeCommunicator.sendMessage(SyncPayload.buildUploadEnd(filename, crc))
+            sendToDevice(SyncPayload.buildUploadEnd(filename, crc))
             val finalAck = withTimeoutOrNull(8_000) {
                 var r: String? = null
                 _bleAckFlow.collect { raw ->
@@ -642,7 +707,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteRingtoneFromDevice(filename: String) {
         viewModelScope.launch {
-            activeCommunicator.sendMessage(SyncPayload.buildDeleteRingtone(filename))
+            sendToDevice(SyncPayload.buildDeleteRingtone(filename))
             alarmRepository.removeUploadedRingtone(filename)
             _uploadedRingtones.value = alarmRepository.getUploadedRingtones()
         }
@@ -667,14 +732,111 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startScan()    = bleManager.startScan()
     fun stopScan()     = bleManager.stopScan()
-    fun connectDevice(address: String) = viewModelScope.launch { bleManager.connect(address) }
-    fun disconnect()   { alarmRepository.clearLastBleMac(); bleManager.disconnect() }
-    fun sendMessage(text: String) = viewModelScope.launch { activeCommunicator.sendMessage(text) }
+    fun connectDevice(address: String, wifiSsid: String = "", wifiPassword: String = "") = viewModelScope.launch {
+        pendingWifiCredentials = wifiSsid.takeIf { it.isNotBlank() }?.let { it to wifiPassword }
+        wifiSsid.takeIf { it.isNotBlank() }?.let(alarmRepository::saveLastWifiSsid)
+        bleManager.connect(address)
+    }
+    fun disconnect() {
+        alarmRepository.clearLastBleMac()
+        wifiCommunicator.disconnect()
+        bleManager.disconnect()
+    }
+    fun sendMessage(text: String) = viewModelScope.launch { sendToDevice(text) }
+    fun configureWifi(ssid: String, password: String) {
+        val cleanSsid = ssid.trim()
+        if (cleanSsid.isEmpty()) {
+            _statusAlert.value = "Enter a Wi-Fi network name first."
+            return
+        }
+        alarmRepository.saveLastWifiSsid(cleanSsid)
+        if (connectionState.value !is ConnectionState.Connected) {
+            pendingWifiCredentials = cleanSsid to password
+            _statusAlert.value = "Wi-Fi settings will be sent when Bluetooth reconnects."
+            return
+        }
+        viewModelScope.launch {
+            val result = bleManager.sendMessage(SyncPayload.buildWifiConfig(cleanSsid, password))
+            if (result.isSuccess) {
+                pendingWifiCredentials = null
+                _statusAlert.value = "Wi-Fi settings sent to the clock."
+            } else {
+                pendingWifiCredentials = cleanSsid to password
+                _statusAlert.value = "Could not send Wi-Fi settings: ${result.exceptionOrNull()?.message}"
+            }
+        }
+    }
+
+    fun retryWifiConnection() {
+        val ip = _lastEspWifiIp.value
+        if (ip == null) {
+            _statusAlert.value = "Connect to the clock over Bluetooth once to discover its Wi-Fi address."
+            return
+        }
+        viewModelScope.launch {
+            val result = wifiCommunicator.connect(ip, null)
+            if (result.isSuccess) pushSyncToDevice()
+        }
+    }
+
     fun clearMessages() { _messages.value = emptyList() }
     fun clearAlert()    { _statusAlert.value = null }
 
     override fun onCleared() {
         super.onCleared()
+        wifiNetworkCallback?.let { runCatching { connectivityManager.unregisterNetworkCallback(it) } }
+        wifiCommunicator.disconnect()
         bleManager.disconnect()
+    }
+
+    private suspend fun sendToDevice(message: String): Result<Unit> {
+        if (wifiCommunicator.connectionState.value is ConnectionState.Connected) {
+            val wifiResult = wifiCommunicator.sendMessage(message)
+            if (wifiResult.isSuccess) return wifiResult
+        }
+        return bleManager.sendMessage(message)
+    }
+
+    private fun registerWifiReconnect() {
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                tryReconnectOnSharedWifi(network)
+            }
+
+            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    tryReconnectOnSharedWifi(network)
+                }
+            }
+
+            override fun onLost(network: Network) {
+                synchronized(autoWifiLock) {
+                    if (lastAutoWifiNetwork == network) lastAutoWifiNetwork = null
+                }
+            }
+        }
+        wifiNetworkCallback = callback
+        runCatching {
+            connectivityManager.registerNetworkCallback(
+                NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),
+                callback
+            )
+        }.onFailure { _statusAlert.value = "Could not monitor Wi-Fi reconnects: ${it.localizedMessage}" }
+    }
+
+    private fun tryReconnectOnSharedWifi(network: Network) {
+        val ip = _lastEspWifiIp.value ?: return
+        val configuredSsid = alarmRepository.getLastWifiSsid()?.trim()?.trim('"') ?: return
+        if (wifiCommunicator.currentWifiSsid()?.trim()?.trim('"') != configuredSsid) return
+        if (wifiCommunicator.connectionState.value is ConnectionState.Connected ||
+            wifiCommunicator.connectionState.value is ConnectionState.Connecting) return
+        synchronized(autoWifiLock) {
+            if (lastAutoWifiNetwork == network) return
+            lastAutoWifiNetwork = network
+        }
+        viewModelScope.launch {
+            val result = wifiCommunicator.connect(ip, network)
+            if (result.isSuccess) pushSyncToDevice()
+        }
     }
 }

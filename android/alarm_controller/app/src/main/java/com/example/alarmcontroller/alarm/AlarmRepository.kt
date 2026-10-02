@@ -18,6 +18,8 @@ class AlarmRepository(context: Context) {
         private const val PREFS_NAME                 = "alarm_controller_prefs"
         private const val KEY_ALARMS                 = "saved_alarms_json"
         private const val KEY_LAST_BLE_MAC           = "last_ble_mac"
+        private const val KEY_LAST_ESP_WIFI_IP       = "last_esp_wifi_ip"
+        private const val KEY_LAST_WIFI_SSID         = "last_wifi_ssid"
         private const val KEY_AUTO_SYNC_HOURS        = "auto_sync_hours"
         private const val KEY_RINGTONE_FILES         = "uploaded_ringtone_files"
         private const val KEY_FOCUS_ONBOARDING_DONE  = "focus_onboarding_done"
@@ -124,6 +126,10 @@ class AlarmRepository(context: Context) {
     fun saveLastBleMac(mac: String) { prefs.edit().putString(KEY_LAST_BLE_MAC, mac).apply() }
     fun getLastBleMac(): String?    = prefs.getString(KEY_LAST_BLE_MAC, null)
     fun clearLastBleMac()           { prefs.edit().remove(KEY_LAST_BLE_MAC).apply() }
+    fun saveLastEspWifiIp(ip: String) { prefs.edit().putString(KEY_LAST_ESP_WIFI_IP, ip).apply() }
+    fun getLastEspWifiIp(): String? = prefs.getString(KEY_LAST_ESP_WIFI_IP, null)
+    fun saveLastWifiSsid(ssid: String) { prefs.edit().putString(KEY_LAST_WIFI_SSID, ssid).apply() }
+    fun getLastWifiSsid(): String? = prefs.getString(KEY_LAST_WIFI_SSID, null)
 
     // ------------------------------------------------------------------
     // Periodic auto-sync
