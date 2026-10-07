@@ -426,6 +426,4 @@ void initBluetoothServer() {
     adv->addServiceUUID(SERVICE_UUID);
     adv->setScanResponse(true);
     BLEDevice::startAdvertising();
-
-    show("BLE ready", DEVICE_NAME);
 }

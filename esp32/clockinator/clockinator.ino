@@ -173,11 +173,6 @@ void snoozeAlarm(int minutes) {
     firingAlarmId.clear();
     firingRingtone = RT_UNKNOWN;
 
-    struct tm ti;
-    localtime_r(&next_alarm, &ti);
-    char buf[32];
-    strftime(buf, sizeof(buf), "Snooze: %H:%M", &ti);
-    show("Snoozed", buf);
 }
 
 /* -------------------------------------------------------------------------

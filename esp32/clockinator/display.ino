@@ -88,12 +88,8 @@ GxEPD2_BW<GxEPD2_370_GDEY037T03, GxEPD2_370_GDEY037T03::HEIGHT> display(
 );
 
 void initDisplay(){
-  
   display.init(115200);
   display.setRotation(1); // Landscape
-
-  show("BOOT", "starting");
-
 }
 
 
