@@ -139,7 +139,8 @@ bool playWavFile(const char* path) {
     }
 
     /* Only PCM (audioFmt == 1) supported */
-    if (audioFmt != 1 || numChannels == 0 || bitsPerSample == 0) {
+    if (audioFmt != 1 || (numChannels != 1 && numChannels != 2) ||
+        (bitsPerSample != 8 && bitsPerSample != 16) || sampleRate == 0) {
         f.close(); return false;
     }
 

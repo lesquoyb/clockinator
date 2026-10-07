@@ -3,7 +3,6 @@ package com.example.alarmcontroller.alarm
 import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONArray
-import java.util.Calendar
 
 /**
  * Persists alarms and app preferences in SharedPreferences as JSON.
@@ -33,12 +32,26 @@ class AlarmRepository(context: Context) {
 
     fun getAlarms(): List<AlarmItem> {
         val raw = prefs.getString(KEY_ALARMS, null) ?: return emptyList()
+        var needsIntervalMigration = false
         val loaded = try {
             val arr = JSONArray(raw)
-            (0 until arr.length()).map { AlarmItem.fromJson(arr.getJSONObject(it)) }
-        } catch (_: Exception) { emptyList() }
+            (0 until arr.length()).map {
+                val json = arr.getJSONObject(it)
+                val recurrence = json.optJSONObject("recurrence")
+                if (recurrence?.optString("type") == "interval" && !recurrence.has("anchorEpochDay")) {
+                    needsIntervalMigration = true
+                }
+                AlarmItem.fromJson(json)
+            }
+        } catch (_: Exception) {
+            needsIntervalMigration = false
+            emptyList()
+        }
         val normalized = loaded.map { it.withRequiredSoundOutputs() }
-        if (normalized != loaded) saveAlarms(normalized)
+        // Persist the date anchor when migrating an existing interval routine.
+        if (normalized != loaded || needsIntervalMigration) {
+            saveAlarms(normalized)
+        }
         return normalized
     }
 
@@ -105,12 +118,10 @@ class AlarmRepository(context: Context) {
      * Returns the enabled alarm whose [type] slot fires soonest from now.
      */
     fun findUpcomingSlot(type: RingtoneType): AlarmItem? {
-        val nowMinutes = nowInMinutes()
-        return getAlarms().filter { it.isEnabled }.minByOrNull { alarm ->
+        val now = System.currentTimeMillis()
+        return getAlarms().filter { it.isEnabled && it.slot(type).enabled }.minByOrNull { alarm ->
             val slot  = alarm.slot(type)
-            val total = slot.hour * 60 + slot.minute
-            val diff  = total - nowMinutes
-            if (diff <= 0) diff + 24 * 60 else diff
+            alarm.recurrence.nextOccurrenceTime(slot.hour, slot.minute, now)
         }
     }
 
@@ -167,10 +178,5 @@ class AlarmRepository(context: Context) {
     // ------------------------------------------------------------------
     // Private helpers
     // ------------------------------------------------------------------
-
-    private fun nowInMinutes(): Int {
-        val cal = Calendar.getInstance()
-        return cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-    }
 
 }

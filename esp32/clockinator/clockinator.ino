@@ -88,8 +88,13 @@ void setNextAlarm() {
     next_alarm_id.clear();
 
     for (auto& kv : alarms) {
-        const Alarm& a = kv.second;
+        Alarm& a = kv.second;
         if (!a.isEnabled) continue;
+        for (int slot = 0; slot < 3; slot++) {
+            RingtoneType type = (RingtoneType)slot;
+            if (a.isDismissed(type) && now >= a.dismissedUntil[slot])
+                a.setDismissed(type, false);
+        }
 
         RingtoneType t;
         time_t ts = a.nextAnyTrigger(now, t);

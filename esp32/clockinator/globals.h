@@ -72,6 +72,7 @@ struct Recurrence {
     RecurrenceType type     = REC_DAILY;
     std::set<int>  days;        // weekdays 1=Mon..7=Sun, for REC_WEEKLY
     int            interval = 1; // days between firings, for REC_INTERVAL
+    long           anchorEpochDay = 0; // local calendar date, shared with Android
 
     time_t nextOccurrence(time_t from_time, int hour, int minute) const;
 };
@@ -92,15 +93,12 @@ struct Alarm {
 
     /* Bitmask of dismissed ringtone slots (bit 0 = lock_phone, 1 = bedtime, 2 = wakeup). */
     uint8_t dismissedMask = 0;
+    time_t dismissedUntil[3] = {0, 0, 0};
 
     bool isDismissed(RingtoneType t) const {
         return (t < 3) && (dismissedMask & (1u << t));
     }
-    void setDismissed(RingtoneType t, bool v) {
-        if (t >= 3) return;
-        if (v) dismissedMask |=  (1u << t);
-        else   dismissedMask &= ~(1u << t);
-    }
+    void setDismissed(RingtoneType t, bool v);
 
     const RingtoneSlot& slot(RingtoneType t) const {
         switch (t) {

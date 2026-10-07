@@ -50,12 +50,27 @@ time_t Recurrence::nextOccurrence(time_t from_time, int hour, int minute) const 
             return candidate; /* fallback: should not reach here */
         }
 
-        case REC_INTERVAL:
-            /* The phone re-syncs after every cycle, so multi-day intervals
-               are managed on the Android side. Return the next-day slot. */
-            return candidate;
+        case REC_INTERVAL: {
+            /* start_time already includes the phone's local UTC offset. */
+            long elapsedDays = (long)(candidate / 86400) - anchorEpochDay;
+            long remainder = ((elapsedDays % interval) + interval) % interval;
+            return candidate + (time_t)((interval - remainder) % interval) * 86400;
+        }
     }
     return candidate;
+}
+
+void Alarm::setDismissed(RingtoneType t, bool v) {
+    if (t >= 3) return;
+    if (v) {
+        dismissedMask |= (1u << t);
+        const RingtoneSlot& s = slot(t);
+        time_t now = start_time + (time_t)(millis() / 1000);
+        dismissedUntil[t] = recurrence.nextOccurrence(now, s.hour, s.minute);
+    } else {
+        dismissedMask &= ~(1u << t);
+        dismissedUntil[t] = 0;
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -64,7 +79,7 @@ time_t Recurrence::nextOccurrence(time_t from_time, int hour, int minute) const 
  *   - alarm is disabled
  *   - slot.enabled is false (only relevant for BEDTIME)
  *   - slot.ringOnDevice is false
- *   - slot is currently dismissed
+ * A dismissed slot advances past its skipped occurrence, then fires normally.
  * -------------------------------------------------------------------------*/
 time_t Alarm::nextTrigger(time_t now, RingtoneType t) const {
     if (!isEnabled) return 0;
@@ -73,7 +88,8 @@ time_t Alarm::nextTrigger(time_t now, RingtoneType t) const {
 
     if (!s.enabled)      return 0;   /* bedtime disabled */
     if (!s.ringOnDevice) return 0;   /* this device should not ring for this slot */
-    if (isDismissed(t))  return 0;   /* skipped for next occurrence */
+    if (isDismissed(t) && dismissedUntil[t] > now)
+        return recurrence.nextOccurrence(dismissedUntil[t], s.hour, s.minute);
 
     return recurrence.nextOccurrence(now, s.hour, s.minute);
 }

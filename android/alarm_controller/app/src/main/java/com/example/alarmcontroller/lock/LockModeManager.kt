@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Activated when the ODODO NFC tag is scanned, released on OBOULO.
  *
  * What this class does automatically:
- *  - Do-Not-Disturb (total silence): requires MANAGE_NOTIFICATION_POLICY, granted
+ *  - Do-Not-Disturb (alarms allowed): requires notification policy access, granted
  *    by the user once via the DND settings screen we deep-link to.
  *  - Grayscale display: requires WRITE_SECURE_SETTINGS (adb one-liner or root).
  *    Silently skipped if the permission is absent.
@@ -32,11 +32,14 @@ class LockModeManager(private val context: Context) {
         private const val TAG = "LockModeManager"
     }
 
-    private val _isLocked = MutableStateFlow(false)
+    private val prefs = context.getSharedPreferences("clockinator_focus", Context.MODE_PRIVATE)
+    private val _isLocked = MutableStateFlow(prefs.getBoolean("active", false))
     /** True while lock/focus mode is active. */
     val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
 
-    private var previousInterruptionFilter = NotificationManager.INTERRUPTION_FILTER_ALL
+    private var previousInterruptionFilter: Int
+        get() = prefs.getInt("previous_filter", NotificationManager.INTERRUPTION_FILTER_ALL)
+        set(value) { prefs.edit().putInt("previous_filter", value).apply() }
 
     // ------------------------------------------------------------------
     // Public API
@@ -48,6 +51,7 @@ class LockModeManager(private val context: Context) {
         enableDnd()
         enableGrayscale()
         _isLocked.value = true
+        prefs.edit().putBoolean("active", true).apply()
     }
 
     fun release() {
@@ -56,6 +60,7 @@ class LockModeManager(private val context: Context) {
         disableDnd()
         disableGrayscale()
         _isLocked.value = false
+        prefs.edit().putBoolean("active", false).apply()
     }
 
     // ------------------------------------------------------------------
@@ -117,13 +122,18 @@ class LockModeManager(private val context: Context) {
             return
         }
         previousInterruptionFilter = nm.currentInterruptionFilter
-        nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
+        nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS)
+        prefs.edit().putBoolean("dnd_changed", true).apply()
     }
 
     private fun disableDnd() {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (!nm.isNotificationPolicyAccessGranted) return
-        nm.setInterruptionFilter(previousInterruptionFilter)
+        if (!nm.isNotificationPolicyAccessGranted || !prefs.getBoolean("dnd_changed", false)) return
+        // Android 15 creates an app-owned Zen rule. ALL deactivates that rule;
+        // restoring a global filter from another app would leave our rule active.
+        nm.setInterruptionFilter(if (Build.VERSION.SDK_INT >= 35)
+            NotificationManager.INTERRUPTION_FILTER_ALL else previousInterruptionFilter)
+        prefs.edit().putBoolean("dnd_changed", false).apply()
     }
 
     // ------------------------------------------------------------------
@@ -134,6 +144,12 @@ class LockModeManager(private val context: Context) {
         if (!hasWriteSecureSettings()) return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                prefs.edit()
+                    .putInt("previous_grayscale_enabled", Settings.Secure.getInt(context.contentResolver,
+                        "accessibility_display_daltonizer_enabled", 0))
+                    .putInt("previous_daltonizer", Settings.Secure.getInt(context.contentResolver,
+                        "accessibility_display_daltonizer", -1))
+                    .putBoolean("grayscale_changed", true).apply()
                 Settings.Secure.putInt(context.contentResolver,
                     "accessibility_display_daltonizer_enabled", 1)
                 Settings.Secure.putInt(context.contentResolver,
@@ -143,11 +159,14 @@ class LockModeManager(private val context: Context) {
     }
 
     private fun disableGrayscale() {
-        if (!hasWriteSecureSettings()) return
+        if (!hasWriteSecureSettings() || !prefs.getBoolean("grayscale_changed", false)) return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 Settings.Secure.putInt(context.contentResolver,
-                    "accessibility_display_daltonizer_enabled", 0)
+                    "accessibility_display_daltonizer", prefs.getInt("previous_daltonizer", -1))
+                Settings.Secure.putInt(context.contentResolver,
+                    "accessibility_display_daltonizer_enabled", prefs.getInt("previous_grayscale_enabled", 0))
+                prefs.edit().putBoolean("grayscale_changed", false).apply()
             }
         } catch (e: Exception) { Log.e(TAG, "Grayscale disable failed", e) }
     }

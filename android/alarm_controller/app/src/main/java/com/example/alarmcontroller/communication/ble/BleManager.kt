@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
@@ -80,7 +81,7 @@ class BleManager(private val context: Context) : DeviceCommunicator {
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     val isBluetoothEnabled: Boolean
-        get() = bluetoothAdapter?.isEnabled == true
+        get() = try { bluetoothAdapter?.isEnabled == true } catch (_: SecurityException) { false }
 
     // ------------------------------------------------------------------
     // BLE scan
@@ -258,7 +259,7 @@ class BleManager(private val context: Context) : DeviceCommunicator {
                 BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             else
                 BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            gatt.writeCharacteristic(char, data, writeType) == BluetoothGatt.GATT_SUCCESS
+            gatt.writeCharacteristic(char, data, writeType) == BluetoothStatusCodes.SUCCESS
         } else {
             @Suppress("DEPRECATION")
             char.value = data
@@ -288,6 +289,7 @@ class BleManager(private val context: Context) : DeviceCommunicator {
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (gatt !== bluetoothGatt) return
             val address = gatt.device.address
             val name    = try { gatt.device.name ?: address } catch (_: SecurityException) { address }
 
@@ -298,6 +300,7 @@ class BleManager(private val context: Context) : DeviceCommunicator {
                     // Short delay recommended by Android BLE docs for stability
                     scope.launch {
                         delay(300)
+                        if (gatt !== bluetoothGatt) return@launch
                         val started = gatt.discoverServices()
                         if (!started) {
                             Log.e(TAG, "discoverServices() returned false")
@@ -321,6 +324,7 @@ class BleManager(private val context: Context) : DeviceCommunicator {
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (gatt !== bluetoothGatt) return
             val address = gatt.device.address
             val name    = try { gatt.device.name ?: address } catch (_: SecurityException) { address }
 

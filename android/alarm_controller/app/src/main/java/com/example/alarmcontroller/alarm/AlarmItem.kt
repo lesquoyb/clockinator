@@ -5,6 +5,8 @@ import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
+import java.time.LocalDate
+import java.time.ZoneId
 
 // ---------------------------------------------------------------------------
 // RingtoneType
@@ -290,7 +292,10 @@ sealed class Recurrence {
     data class Weekly(val days: Set<Int>) : Recurrence() {
         init { require(days.isNotEmpty() && days.all { it in 1..7 }) }
     }
-    data class EveryDays(val interval: Int) : Recurrence() {
+    data class EveryDays(
+        val interval: Int,
+        val anchorEpochDay: Long = LocalDate.now().toEpochDay()
+    ) : Recurrence() {
         init { require(interval in 1..365) }
     }
 
@@ -311,7 +316,13 @@ sealed class Recurrence {
                 val day = (today - 1 + offset) % 7 + 1
                 day in days && (offset > 0 || calendar.timeInMillis > nowMillis)
             }
-            is EveryDays -> if (calendar.timeInMillis <= nowMillis) interval else 0
+            is EveryDays -> {
+                val todayEpochDay = java.time.Instant.ofEpochMilli(nowMillis)
+                    .atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+                val firstDay = if (calendar.timeInMillis <= nowMillis) 1 else 0
+                val remainder = Math.floorMod(todayEpochDay + firstDay - anchorEpochDay, interval.toLong())
+                firstDay + ((interval - remainder) % interval).toInt()
+            }
         }
         calendar.add(Calendar.DAY_OF_YEAR, daysToAdd)
         return calendar.timeInMillis
@@ -321,7 +332,11 @@ sealed class Recurrence {
         when (this@Recurrence) {
             Daily        -> put("type", "daily")
             is Weekly    -> { put("type", "weekly"); put("days", days.sorted().joinToString(",")) }
-            is EveryDays -> { put("type", "interval"); put("intervalDays", interval) }
+            is EveryDays -> {
+                put("type", "interval")
+                put("intervalDays", interval)
+                put("anchorEpochDay", anchorEpochDay)
+            }
         }
     }
 
@@ -344,7 +359,10 @@ sealed class Recurrence {
                         .filter { it in 1..7 }.toSet()
                     if (days.isEmpty()) Daily else Weekly(days)
                 }
-                "interval" -> EveryDays(json.optInt("intervalDays", 1).coerceIn(1, 365))
+                "interval" -> EveryDays(
+                    json.optInt("intervalDays", 1).coerceIn(1, 365),
+                    json.optLong("anchorEpochDay", LocalDate.now().toEpochDay())
+                )
                 else       -> Daily
             }
         }

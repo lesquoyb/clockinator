@@ -59,6 +59,7 @@ static struct UploadSession {
     File     file;
     int      expectedIndex = 0;
     uint32_t totalSize     = 0;
+    uint32_t receivedSize  = 0;
 } uploadSession;
 
 static uint32_t uploadCrc = 0xFFFFFFFFu;
@@ -138,6 +139,8 @@ static Recurrence parseRecurrence(JsonObject rec) {
     } else if (strcmp(t, "interval") == 0) {
         r.type     = REC_INTERVAL;
         r.interval = max(1, (int)(rec["intervalDays"] | 1));
+        r.interval = min(365, r.interval);
+        r.anchorEpochDay = rec["anchorEpochDay"] | (long)((start_time + millis() / 1000) / 86400);
     } else {
         r.type = REC_DAILY;
     }
@@ -177,6 +180,9 @@ static void parseAndStoreAlarm(JsonObject obj) {
     Alarm a;
     a.id        = std::string(idStr);
     a.isEnabled = true;
+    a.lockPhone.enabled = false;
+    a.bedtime.enabled = false;
+    a.wakeup.enabled = false;
 
     const char* rf = obj["file"] | "";
     a.ringtoneFile = (strlen(rf) > 0) ? (std::string("/") + rf) : std::string("");
@@ -192,6 +198,9 @@ static void parseAndStoreAlarm(JsonObject obj) {
         a.wakeup    = parseSlot(obj["wake"].as<JsonObject>(), RT_WAKEUP);
     } 
 
+    // Parse recurrence before calculating the skipped occurrence's date.
+    a.recurrence = parseRecurrence(obj["recurrence"].as<JsonObject>());
+
     /* Dismissed set */
     a.dismissedMask = 0;
     if (obj.containsKey("dismissed")) {
@@ -200,11 +209,6 @@ static void parseAndStoreAlarm(JsonObject obj) {
             if (rt != RT_UNKNOWN) a.setDismissed(rt, true);
         }
     }
-
-    if (obj.containsKey("recurrence"))
-        a.recurrence = parseRecurrence(obj["recurrence"].as<JsonObject>());
-    else
-        a.recurrence.type = REC_DAILY;
 
     alarms[a.id] = a;
 }
@@ -326,11 +330,12 @@ void processIncomingCommand(String raw) {
 
             String path = String("/") + fname;
             uploadSession.file = LittleFS.open(path, "w");
-            if (!uploadSession.file) { notifyPhone("{\"ack\":\"UPLOAD_ERR\"}"); return; }
+            if (!uploadSession.file) { uploadSession.active = false; notifyPhone("UPLOAD_ERR"); return; }
             uploadSession.active        = true;
             uploadSession.filename      = path;
             uploadSession.expectedIndex = 0;
             uploadSession.totalSize     = size;
+            uploadSession.receivedSize  = 0;
             uploadCrc                   = 0xFFFFFFFFu;
             return;
         }
@@ -340,13 +345,29 @@ void processIncomingCommand(String raw) {
             if (!uploadSession.active) return;
             int         idx = doc["index"] | -1;
             const char* b64 = doc["data"]  | "";
+            // Re-ACK a retry after a lost reply, without appending data twice.
+            if (idx >= 0 && idx == uploadSession.expectedIndex - 1) {
+                char ack[32];
+                snprintf(ack, sizeof(ack), "CHUNK_ACK:%d", idx);
+                notifyPhone(ack);
+                return;
+            }
             if (idx != uploadSession.expectedIndex) return;
 
             uint8_t buf[512];
             int     len = b64Decode(b64, strlen(b64), buf, sizeof(buf));
-            if (len < 0) { notifyPhone("UPLOAD_ERR"); return; }
+            if (len <= 0 || (uint32_t)len > uploadSession.totalSize - uploadSession.receivedSize) {
+                notifyPhone("UPLOAD_ERR"); return;
+            }
 
-            uploadSession.file.write(buf, (size_t)len);
+            if (uploadSession.file.write(buf, (size_t)len) != (size_t)len) {
+                uploadSession.file.close();
+                uploadSession.active = false;
+                LittleFS.remove(uploadSession.filename);
+                notifyPhone("UPLOAD_ERR");
+                return;
+            }
+            uploadSession.receivedSize += (uint32_t)len;
             crcUpdate(buf, (size_t)len);
             uploadSession.expectedIndex++;
 
@@ -363,7 +384,7 @@ void processIncomingCommand(String raw) {
             uploadSession.active = false;
 
             uint32_t expected = doc["crc"] | 0u;
-            if (expected == crcFinalise()) {
+            if (uploadSession.receivedSize == uploadSession.totalSize && expected == crcFinalise()) {
                 notifyPhone("UPLOAD_OK");
             } else {
                 LittleFS.remove(uploadSession.filename);

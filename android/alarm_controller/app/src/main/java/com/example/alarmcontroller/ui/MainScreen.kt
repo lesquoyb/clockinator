@@ -693,6 +693,8 @@ fun DeviceTab(
     isConnected: Boolean
 ) {
     val listState = rememberLazyListState()
+    val wifiState by viewModel.wifiConnectionState.collectAsState()
+    val canSendToDevice = isConnected || wifiState is ConnectionState.Connected
     var textToSend by remember { mutableStateOf("") }
 
     LaunchedEffect(messages.size) {
@@ -726,7 +728,7 @@ fun DeviceTab(
         ScanSection(isScanning, isConnected, scannedDevices, { viewModel.startScan() }, { viewModel.stopScan() }, { viewModel.connectDevice(it) })
         Spacer(Modifier.height(10.dp))
 
-        if (isConnected) {
+        if (canSendToDevice) {
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Remote controls", style = MaterialTheme.typography.titleSmall)
@@ -783,20 +785,20 @@ fun DeviceTab(
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = textToSend, onValueChange = { textToSend = it },
-                modifier = Modifier.weight(1f), placeholder = { Text("Send BLE command…") },
-                singleLine = true, enabled = isConnected
+                modifier = Modifier.weight(1f), placeholder = { Text("Send command…") },
+                singleLine = true, enabled = canSendToDevice
             )
             Spacer(Modifier.width(8.dp))
             IconButton(
                 onClick = { viewModel.sendMessage(textToSend); textToSend = "" },
-                enabled = isConnected && textToSend.isNotBlank(),
+                enabled = canSendToDevice && textToSend.isNotBlank(),
                 modifier = Modifier.size(48.dp).background(
-                    if (isConnected && textToSend.isNotBlank()) MaterialTheme.colorScheme.primary
+                    if (canSendToDevice && textToSend.isNotBlank()) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.surfaceVariant, CircleShape
                 )
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, "Send",
-                    tint = if (isConnected && textToSend.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                    tint = if (canSendToDevice && textToSend.isNotBlank()) MaterialTheme.colorScheme.onPrimary
                            else MaterialTheme.colorScheme.outline)
             }
         }
@@ -819,6 +821,8 @@ fun SettingsTab(
     val uploadedRingtones by viewModel.uploadedRingtones.collectAsState()
     val uploadState       by viewModel.uploadState.collectAsState()
     val isLocked          by viewModel.lockModeManager.isLocked.collectAsState()
+    val wifiConnectionState by viewModel.wifiConnectionState.collectAsState()
+    val canSendToDevice = isConnected || wifiConnectionState is ConnectionState.Connected
 
     // Activity context is required to start system settings intents on Android 10+
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -844,12 +848,11 @@ fun SettingsTab(
         }
 
         SettingsSection(title = "Alarm clock") {
-            Text(if (isConnected) "Connected and syncing alarms" else "Not connected",
+            Text(if (canSendToDevice) "Connected and syncing alarms" else "Not connected",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = onOpenDevice) { Text("Manage connection") }
         }
 
-        val wifiConnectionState by viewModel.wifiConnectionState.collectAsState()
         var wifiSsid by rememberSaveable { mutableStateOf("") }
         var wifiPassword by rememberSaveable { mutableStateOf("") }
         SettingsSection(title = "Local Wi-Fi") {
@@ -974,7 +977,7 @@ fun SettingsTab(
 
             Button(
                 onClick  = { wavPicker.launch("audio/wav") },
-                enabled  = isConnected,
+                enabled  = canSendToDevice && uploadState !is MainViewModel.UploadState.InProgress,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Upload, null, Modifier.size(16.dp))

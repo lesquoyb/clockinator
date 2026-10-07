@@ -41,17 +41,12 @@ class AlarmReceiver : BroadcastReceiver() {
         val repository = AlarmRepository(context)
         val alarm      = repository.getAlarmById(alarmId)
 
-        // Snooze triggers don't need the alarm to still exist
         if (alarm == null) {
-            if (isSnooze) {
-                AlarmRingtoneService.startAlarm(context, alarmId, "$title (Snooze)", ringtone)
-            } else {
-                Log.w(TAG, "Alarm $alarmId not found, skipping")
-            }
+            Log.w(TAG, "Alarm $alarmId not found, skipping")
             return
         }
 
-        if (!alarm.isEnabled && !isSnooze) {
+        if (!alarm.isEnabled) {
             Log.d(TAG, "Alarm $title disabled, skipping")
             return
         }

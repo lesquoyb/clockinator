@@ -50,6 +50,7 @@ class AlarmScheduler(private val context: Context) {
 
     fun cancelAlarm(alarm: AlarmItem) {
         RingtoneType.entries.forEach { cancelSlot(alarm.id, it) }
+        cancelPendingIntent(alarm.id.hashCode() + 9999)
     }
 
     fun scheduleSnooze(alarmId: String, title: String, ringtone: RingtoneType, delayMinutes: Int = 10) {
@@ -113,10 +114,16 @@ class AlarmScheduler(private val context: Context) {
     }
 
     private fun cancelSlot(alarmId: String, type: RingtoneType) {
-        val intent = Intent(context, AlarmReceiver::class.java)
+        cancelPendingIntent(getRequestCode(alarmId, type))
+    }
+
+    private fun cancelPendingIntent(requestCode: Int) {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = AlarmReceiver.ACTION_ALARM_TRIGGER
+        }
         val pi = PendingIntent.getBroadcast(
             context,
-            getRequestCode(alarmId, type),
+            requestCode,
             intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         ) ?: return

@@ -132,6 +132,7 @@ class AlarmRingtoneService : Service() {
     }
 
     private fun startSoundAndVibration() {
+        releaseMediaPlayer()
         // --- Audio ---
         try {
             val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -166,11 +167,14 @@ class AlarmRingtoneService : Service() {
         }
     }
 
-    private fun stopSelfAndCleanup() {
-        try { mediaPlayer?.stop(); mediaPlayer?.release() }
+    private fun releaseMediaPlayer() {
+        try { mediaPlayer?.release() }
         catch (e: Exception) { Log.e(TAG, "Error stopping media player", e) }
         finally { mediaPlayer = null }
+    }
 
+    private fun cleanup() {
+        releaseMediaPlayer()
         try { vibrator?.cancel() }
         catch (e: Exception) { Log.e(TAG, "Error stopping vibration", e) }
 
@@ -178,7 +182,10 @@ class AlarmRingtoneService : Service() {
         _ringingAlarmTitle.value = null
         activeAlarmId            = null
         activeRingtoneType       = null
+    }
 
+    private fun stopSelfAndCleanup() {
+        cleanup()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -222,7 +229,7 @@ class AlarmRingtoneService : Service() {
     }
 
     override fun onDestroy() {
+        cleanup()
         super.onDestroy()
-        stopSelfAndCleanup()
     }
 }

@@ -20,11 +20,14 @@ import com.example.alarmcontroller.communication.ConnectionState
 import com.example.alarmcontroller.communication.DeviceMessage
 import com.example.alarmcontroller.communication.MessageDirection
 import com.example.alarmcontroller.communication.SyncPayload
+import com.example.alarmcontroller.communication.sendAndAwaitUploadAck
 import com.example.alarmcontroller.communication.ble.BleDeviceItem
 import com.example.alarmcontroller.communication.ble.BleManager
 import com.example.alarmcontroller.communication.wifi.WifiCommunicator
 import com.example.alarmcontroller.lock.LockModeManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +36,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import android.util.Base64
 import java.io.InputStream
 import java.util.zip.CRC32
@@ -161,7 +163,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else _statusAlert.value = "Could not send Wi-Fi settings: ${result.exceptionOrNull()?.message}"
                     }
                     pushSyncToDevice()
-                    _hasPendingSync.value = false
                 }
             }
         }
@@ -349,16 +350,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         snoozeDurations: List<Int> = AlarmItem.DEFAULT_SNOOZE_DURATIONS,
         ringtoneFile: String? = null
     ) {
+        val existing = id?.let(alarmRepository::getAlarmById)
+        val existingInterval = existing?.recurrence as? Recurrence.EveryDays
+        val savedRecurrence = if (recurrence is Recurrence.EveryDays &&
+            existingInterval?.interval == recurrence.interval) existingInterval else recurrence
         val alarm = AlarmItem(
             id              = id ?: java.util.UUID.randomUUID().toString(),
             title           = title,
-            isEnabled       = true,
-            recurrence      = recurrence,
+            isEnabled       = existing?.isEnabled ?: true,
+            recurrence      = savedRecurrence,
             lockPhone       = lockPhone,
             bedtime         = bedtime,
             wakeup          = wakeup,
             snoozeDurations = snoozeDurations,
-            ringtoneFile    = ringtoneFile
+            ringtoneFile    = ringtoneFile,
+            dismissedRingtones = existing?.dismissedRingtones ?: emptySet()
         ).withRequiredSoundOutputs()
         alarmRepository.addOrUpdateAlarm(alarm)
         alarmScheduler.scheduleAlarm(alarm)
@@ -440,6 +446,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
+            loadAlarms()
             val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value))
             if (result.isSuccess) {
                 _hasPendingSync.value = false
@@ -579,7 +586,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * The device will loop until it receives a STOP_ALARM with the matching IDs.
      */
     fun pushRingtoneToDevice(alarm: AlarmItem, ringtone: RingtoneType) {
-        if (connectionState.value !is ConnectionState.Connected) {
+        if (!isDeviceConnected()) {
             _statusAlert.value = "Not connected, cannot push ringtone."
             return
         }
@@ -634,25 +641,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------
 
     fun uploadRingtoneToDevice(wavUri: Uri, filename: String) {
-        if (connectionState.value !is ConnectionState.Connected) {
+        if (_uploadState.value is UploadState.InProgress) return
+        if (!isDeviceConnected()) {
             _uploadState.value = UploadState.Error("Not connected, cannot upload.")
             return
         }
+        // Keep one transport for the whole session; a mid-transfer fallback
+        // could leave the device uncertain whether a chunk was already written.
+        val transport = if (wifiCommunicator.connectionState.value is ConnectionState.Connected)
+            wifiCommunicator else bleManager
+        _uploadState.value = UploadState.InProgress(filename, 0f)
         viewModelScope.launch {
-            _uploadState.value = UploadState.InProgress(filename, 0f)
 
             val bytes: ByteArray = try {
-                getApplication<Application>().contentResolver
-                    .openInputStream(wavUri)?.use(InputStream::readBytes)
-                    ?: run { _uploadState.value = UploadState.Error("Cannot open file."); return@launch }
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver
+                        .openInputStream(wavUri)?.use(InputStream::readBytes)
+                } ?: run { _uploadState.value = UploadState.Error("Cannot open file."); return@launch }
             } catch (e: Exception) {
                 _uploadState.value = UploadState.Error("Read error: ${e.message}"); return@launch
+            }
+            if (bytes.isEmpty()) {
+                _uploadState.value = UploadState.Error("The file is empty.")
+                return@launch
             }
 
             val crc         = CRC32().apply { update(bytes) }.value
             val totalChunks = (bytes.size + SyncPayload.CHUNK_SIZE_BYTES - 1) / SyncPayload.CHUNK_SIZE_BYTES
 
-            sendToDevice(SyncPayload.buildUploadBegin(filename, bytes.size))
+            if (transport.sendMessage(SyncPayload.buildUploadBegin(filename, bytes.size)).isFailure) {
+                _uploadState.value = UploadState.Error("Could not begin upload.")
+                return@launch
+            }
             delay(200)
 
             for (i in 0 until totalChunks) {
@@ -663,13 +683,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 var acked   = false
                 var retries = 0
                 while (!acked && retries < 3) {
-                    sendToDevice(SyncPayload.buildUploadChunk(i, b64))
-                    val ack = withTimeoutOrNull(5_000) {
-                        var r: String? = null
-                        _bleAckFlow.collect { raw ->
-                            if (raw == "${SyncPayload.ACK_CHUNK}$i") { r = raw; return@collect }
-                        }
-                        r
+                    val ack = sendAndAwaitUploadAck(
+                        _bleAckFlow, 5_000,
+                        { it == "${SyncPayload.ACK_CHUNK}$i" }
+                    ) {
+                        transport.sendMessage(SyncPayload.buildUploadChunk(i, b64))
+                    }
+                    if (ack == SyncPayload.ACK_UPLOAD_ERR) {
+                        _uploadState.value = UploadState.Error("Device rejected chunk $i.")
+                        return@launch
                     }
                     if (ack != null) acked = true else retries++
                 }
@@ -680,15 +702,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uploadState.value = UploadState.InProgress(filename, (i + 1f) / totalChunks)
             }
 
-            sendToDevice(SyncPayload.buildUploadEnd(filename, crc))
-            val finalAck = withTimeoutOrNull(8_000) {
-                var r: String? = null
-                _bleAckFlow.collect { raw ->
-                    if (raw == SyncPayload.ACK_UPLOAD_OK || raw == SyncPayload.ACK_UPLOAD_ERR) {
-                        r = raw; return@collect
-                    }
-                }
-                r
+            val finalAck = sendAndAwaitUploadAck(
+                _bleAckFlow, 8_000,
+                { it == SyncPayload.ACK_UPLOAD_OK }
+            ) {
+                transport.sendMessage(SyncPayload.buildUploadEnd(filename, crc))
             }
 
             if (finalAck == SyncPayload.ACK_UPLOAD_OK) {
@@ -719,7 +737,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun writeNfcTag(tag: android.nfc.Tag, payload: String) {
         viewModelScope.launch {
-            val result = com.example.alarmcontroller.alarm.nfc.NfcWriteManager.write(tag, payload)
+            val result = withContext(Dispatchers.IO) {
+                com.example.alarmcontroller.alarm.nfc.NfcWriteManager.write(tag, payload)
+            }
             _nfcToastMessages.trySend(if (result.isSuccess)
                 "Tag written: '$payload'."
             else "Write failed: ${result.exceptionOrNull()?.message}")
@@ -796,6 +816,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         return bleManager.sendMessage(message)
     }
+
+    private fun isDeviceConnected(): Boolean =
+        connectionState.value is ConnectionState.Connected ||
+            wifiCommunicator.connectionState.value is ConnectionState.Connected
 
     private fun registerWifiReconnect() {
         val callback = object : ConnectivityManager.NetworkCallback() {

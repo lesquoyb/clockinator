@@ -1,4 +1,3 @@
-2. Optionally configure Wi-Fi in the pairing screen or later in **Settings → Local Wi-Fi**. The phone's current network name can be filled in automatically; Android still requires the password to be entered.
 # Clockinator
 
 **A smart alarm clock synced with your phone, so you can leave your phone outside the bedroom.**
@@ -33,7 +32,6 @@ You can program tags from the app's settings. Tags already written with these va
 - **Android is the source of truth** for routines and recurrence. Phone alarms are scheduled locally with `AlarmManager` and do not depend on an internet connection.
 - **The phone synchronizes routines, time, alarm actions, and ringtone uploads** over Wi-Fi when connected, with BLE available for pairing and fallback.
 - **BLE remains available for pairing and fallback.** During setup, you can optionally enter a local Wi-Fi SSID and password; the app sends them to the ESP32 over BLE.
-- **When configured, the ESP32 joins the 2.4 GHz Wi-Fi network** and opens a TCP server on port `4210`. The app connects to its address announced over BLE and sends commands over Wi-Fi, falling back to BLE if TCP is unavailable. Both channels remain active.
 - **When configured, the ESP32 joins the Wi-Fi network** and opens a TCP server on port `4210`. Supported bands depend on the chip: classic ESP32 variants are generally 2.4 GHz only, while ESP32-C5 supports 2.4 and 5 GHz. The app connects to its address announced over BLE and falls back to BLE if TCP is unavailable.
 - **The ESP32 calculates and displays the next event**, then plays a built-in melody or a WAV file uploaded from the app. It can notify the phone when an alarm is stopped, snoozed, or skipped so both devices stay in sync.
 - **After the alarm clock restarts**, the phone sends routines again when BLE reconnects. The firmware keeps the routine list in RAM; it is not persisted to flash.
@@ -65,7 +63,7 @@ Check the power requirements and exact pinout of your modules before wiring. The
 
 ## Build and run the Android app
 
-Requirements: Android Studio with Android SDK 35 and JDK 17. The app targets Android 15 (API 35) and supports Android 8.0 (API 26) and later.
+Requirements: Android Studio with Android SDK 35 and JDK 21 for the Gradle daemon (configured in `gradle/gradle-daemon-jvm.properties`). The app compiles to Java/Kotlin 17, targets Android 15 (API 35), and supports Android 8.0 (API 26) and later.
 
 Open `android/alarm_controller` in Android Studio and run the `app` configuration on an Android phone. To build a debug APK from the repository root:
 

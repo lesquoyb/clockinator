@@ -198,6 +198,7 @@ class MainActivity : ComponentActivity() {
             perms += Manifest.permission.BLUETOOTH
             perms += Manifest.permission.BLUETOOTH_ADMIN
             perms += Manifest.permission.ACCESS_FINE_LOCATION
+            perms += Manifest.permission.ACCESS_COARSE_LOCATION
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms += Manifest.permission.POST_NOTIFICATIONS

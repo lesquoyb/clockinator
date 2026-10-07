@@ -232,6 +232,7 @@ private fun CurrentWifiNetworkButton(onSsidFound: (String) -> Unit) {
             add(Manifest.permission.NEARBY_WIFI_DEVICES)
         }
         add(Manifest.permission.ACCESS_FINE_LOCATION)
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
