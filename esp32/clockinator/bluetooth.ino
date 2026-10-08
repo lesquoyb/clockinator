@@ -181,6 +181,14 @@ static void parseAndStoreAlarm(JsonObject obj) {
     Alarm a;
     a.id        = std::string(idStr);
     a.isEnabled = true;
+    if (obj["snoozeDurations"].is<JsonArray>()) {
+        std::vector<int> durations;
+        for (JsonVariant value : obj["snoozeDurations"].as<JsonArray>()) {
+            if (value.is<int>() && value.as<int>() >= 1 && value.as<int>() <= 1440 && durations.size() < 16)
+                durations.push_back(value.as<int>());
+        }
+        if (!durations.empty()) a.snoozeDurations = durations;
+    }
     a.lockPhone.enabled = false;
     a.bedtime.enabled = false;
     a.wakeup.enabled = false;
@@ -248,6 +256,14 @@ void processIncomingCommand(String raw) {
         }
 
         const char* action = doc["action"] | "";
+        if (strcmp(action, "SET_LIGHT") == 0) {
+            if (doc["enabled"].is<bool>()) setClockLight(doc["enabled"].as<bool>());
+            return;
+        }
+        if (strcmp(action, "GET_LIGHT") == 0) {
+            notifyLightStatus();
+            return;
+        }
         if (strcmp(action, "REFRESH_DISPLAY") == 0) {
             postCommand(CMD_DISPLAY_REFRESH);
             return;
@@ -291,6 +307,7 @@ void processIncomingCommand(String raw) {
                 parseAndStoreAlarm(obj);
             postCommand(CMD_SYNC_PUSH);
             notifyWifiStatus();
+            notifyLightStatus();
             return;
         }
 
@@ -301,9 +318,7 @@ void processIncomingCommand(String raw) {
 
             /* Guard: only stop if it is the alarm that is currently ringing.
                An empty alarmId means "stop anything" (legacy / test). */
-            bool matches = (strlen(alarmId) == 0) ||
-                           (firingAlarmId == std::string(alarmId) &&
-                            (rt == RT_UNKNOWN || rt == firingRingtone));
+            bool matches = selectAlarmControlTarget(alarmId, rt);
             if (matches) {
                 isRinging = false;
                 postCommand(CMD_STOP);
@@ -316,10 +331,9 @@ void processIncomingCommand(String raw) {
             const char* alarmId = doc["alarmId"] | "";
             RingtoneType rt     = ringtoneFromWire(doc["ringtone"] | "");
             int minutes         = doc["minutes"] | 10;
+            if (minutes < 1 || minutes > 1440) return;
 
-            bool matches = (strlen(alarmId) == 0) ||
-                           (firingAlarmId == std::string(alarmId) &&
-                            (rt == RT_UNKNOWN || rt == firingRingtone));
+            bool matches = selectAlarmControlTarget(alarmId, rt);
             if (matches) {
                 isRinging = false;
                 postCommand(CMD_SNOOZE, minutes);

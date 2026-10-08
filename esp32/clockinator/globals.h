@@ -16,6 +16,7 @@
 #include <string>
 #include <set>
 #include <map>
+#include <vector>
 #include <ArduinoJson.h>
 #include "driver/i2s.h"
 
@@ -82,6 +83,7 @@ struct Recurrence {
  * Alarm
  * -------------------------------------------------------------------------*/
 struct Alarm {
+    std::vector<int> snoozeDurations = {5, 10, 30, 60};
     std::string  id;
     bool         isEnabled    = true;
     std::string  ringtoneFile;  // LittleFS path e.g. "/alarm1.wav"; empty = melody
@@ -169,6 +171,15 @@ void setNextAlarm();
 void startRinging();
 void stopAlarm();
 void snoozeAlarm(int minutes);
+void initPhysicalControls();
+void setClockLight(bool enabled);
+void notifyLightStatus();
+void servicePhysicalControls();
+void applyPhysicalControls();
+void cyclePhysicalSnooze();
+void stopFromPhysicalButton();
+bool hasPendingSnooze();
+bool selectAlarmControlTarget(const char* id, RingtoneType type);
 void postCommand(PendingCommandType type, int minutes = 0);
 extern QueueHandle_t cmdQueue;
 

@@ -82,6 +82,50 @@ volatile RingtoneType firingRingtone = RT_UNKNOWN;
 std::string           firingAlarmId;
 const char*           activeRingtoneFile = "";
 static std::string    activeRingtoneStorage;
+static std::string snoozedAlarmId;
+static RingtoneType snoozedRingtone = RT_UNKNOWN;
+static time_t snoozedUntil = 0;
+static std::string snoozeCycleAlarmId;
+static RingtoneType snoozeCycleRingtone = RT_UNKNOWN;
+static size_t snoozeCycleIndex = 0;
+
+bool hasPendingSnooze() { return snoozedUntil > 0 && !snoozedAlarmId.empty(); }
+
+bool selectAlarmControlTarget(const char* id, RingtoneType type) {
+    const bool any = !id || !*id;
+    if (!firingAlarmId.empty() && (any || firingAlarmId == id) &&
+        (type == RT_UNKNOWN || type == firingRingtone)) return true;
+    if (hasPendingSnooze() && (any || snoozedAlarmId == id) &&
+        (type == RT_UNKNOWN || type == snoozedRingtone)) {
+        firingAlarmId = snoozedAlarmId;
+        firingRingtone = snoozedRingtone;
+        return true;
+    }
+    return any && isRinging;
+}
+
+void stopFromPhysicalButton() {
+    selectAlarmControlTarget("", RT_UNKNOWN);
+    cancelAudioTest();
+    stopAlarm();
+    snoozeCycleAlarmId.clear();
+    snoozeCycleIndex = 0;
+}
+
+void cyclePhysicalSnooze() {
+    if (!selectAlarmControlTarget("", RT_UNKNOWN) || firingAlarmId.empty()) return;
+    if (snoozeCycleAlarmId != firingAlarmId || snoozeCycleRingtone != firingRingtone) {
+        snoozeCycleAlarmId = firingAlarmId;
+        snoozeCycleRingtone = firingRingtone;
+        snoozeCycleIndex = 0;
+    }
+    const auto it = alarms.find(firingAlarmId);
+    if (it == alarms.end() || it->second.snoozeDurations.empty()) return;
+    const auto& durations = it->second.snoozeDurations;
+    const int minutes = durations[snoozeCycleIndex % durations.size()];
+    snoozeCycleIndex = (snoozeCycleIndex + 1) % durations.size();
+    snoozeAlarm(minutes);
+}
 
 /* -------------------------------------------------------------------------
  * setNextAlarm
@@ -114,6 +158,18 @@ void setNextAlarm() {
         }
     }
 
+    if (hasPendingSnooze()) {
+        const auto it = alarms.find(snoozedAlarmId);
+        if (it == alarms.end() || !it->second.isEnabled ||
+            !it->second.slot(snoozedRingtone).enabled || !it->second.slot(snoozedRingtone).ringOnDevice) {
+            snoozedUntil = 0;
+            snoozedAlarmId.clear();
+        } else if (earliest == 0 || snoozedUntil < earliest) {
+            earliest = snoozedUntil;
+            next_alarm_id = snoozedAlarmId;
+            next_alarm_type = snoozedRingtone;
+        }
+    }
     next_alarm = earliest;
 }
 
@@ -122,6 +178,10 @@ void setNextAlarm() {
  * Must only be called from core 1.
  * -------------------------------------------------------------------------*/
 void startRinging() {
+    if (snoozedAlarmId == firingAlarmId && snoozedRingtone == firingRingtone) {
+        snoozedUntil = 0;
+        snoozedAlarmId.clear();
+    }
     auto it = alarms.find(firingAlarmId);
     if (it != alarms.end() && !it->second.ringtoneFile.empty()) {
         // Keep playback's path valid when a subsequent SYNC replaces the alarm map.
@@ -139,6 +199,10 @@ void startRinging() {
  * Silences the current alarm, notifies the phone, then reschedules.
  * -------------------------------------------------------------------------*/
 void stopAlarm() {
+    if (snoozedAlarmId == firingAlarmId && snoozedRingtone == firingRingtone) {
+        snoozedUntil = 0;
+        snoozedAlarmId.clear();
+    }
     isRinging          = false;
     activeRingtoneFile = "";
     i2s_zero_dma_buffer(I2S_PORT);
@@ -169,6 +233,7 @@ void stopAlarm() {
  * Must only be called from core 1.
  * -------------------------------------------------------------------------*/
 void snoozeAlarm(int minutes) {
+    if (minutes < 1 || minutes > 1440 || firingAlarmId.empty() || firingRingtone == RT_UNKNOWN) return;
     isRinging          = false;
     activeRingtoneFile = "";
     i2s_zero_dma_buffer(I2S_PORT);
@@ -183,12 +248,13 @@ void snoozeAlarm(int minutes) {
     }
 
     time_t now      = start_time + (time_t)(millis() / 1000);
-    next_alarm      = now + (time_t)(minutes * 60);
-    next_alarm_type = firingRingtone;
-    next_alarm_id   = firingAlarmId;
+    snoozedUntil    = now + (time_t)(minutes * 60);
+    snoozedRingtone = firingRingtone;
+    snoozedAlarmId  = firingAlarmId;
+    setNextAlarm();
     firingAlarmId.clear();
     firingRingtone = RT_UNKNOWN;
-
+    drawClock(); // Android and physical snooze commands immediately update the time shown.
 }
 
 /* -------------------------------------------------------------------------
@@ -432,9 +498,12 @@ void setup() {
     initDisplay();
     initWifi();
     initBluetoothServer();
+    initPhysicalControls();
 }
 
 void loop() {
+    servicePhysicalControls();
+    applyPhysicalControls();
     serviceIncomingBluetooth();
     serviceAlarmVolume();
     /* Drain any commands posted by the BLE task first. */
@@ -462,6 +531,7 @@ void loop() {
     }
 
     if (isRinging) playAlarm();
+    applyPhysicalControls();
     refreshVolumeDisplay();
 
     delay(100);
