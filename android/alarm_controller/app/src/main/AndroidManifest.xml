@@ -61,6 +61,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
+        android:name=".ClockApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -97,6 +98,13 @@
         </receiver>
 
         <!-- Boot Receiver to restore alarms after reboot -->
+        <receiver android:name=".communication.ble.ClockPresenceReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".alarm.BootReceiver"
             android:exported="true">
@@ -112,6 +120,8 @@
             android:foregroundServiceType="mediaPlayback" />
 
         <!-- Migration stub: retires the former sticky waiting notification. -->
+        <service android:name=".communication.ble.ClockStatusService" android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
         <service
             android:name=".communication.ble.BleAutoConnectService"
             android:exported="false"

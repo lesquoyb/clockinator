@@ -1,4 +1,5 @@
 #pragma once
+#include "Version.h"
 
 /*
  * globals.h
@@ -150,7 +151,8 @@ enum PendingCommandType {
     CMD_SNOOZE,
     CMD_SYNC_PUSH,  /* alarm list was updated; recalculate next trigger */
     CMD_BLE_CONNECTED,
-    CMD_BLE_DISCONNECTED
+    CMD_BLE_DISCONNECTED,
+    CMD_DISPLAY_REFRESH
 };
 
 struct PendingCommand {
@@ -175,6 +177,14 @@ void initDisplay();
 void show(const char* line1);
 void show(const char* line1, const char* line2);
 void drawClock();
+extern time_t lastClockMinute;
+void requestFullClockRefresh();
+void queueInitialClockRefresh();
+void noteClockLinkChange();
+void serviceClockRefresh();
+void setDisplayRefreshMinutes(unsigned minutes);
+bool clockConnectionsReadyForRefresh();
+void serviceIncomingBluetooth();
 
 /* sound.ino */
 void initAlarmVolume();

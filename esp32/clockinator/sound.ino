@@ -54,6 +54,7 @@ static void playTone(float frequency, int durationMs) {
 
     while (generated < samples) {
         serviceWifi();
+        serviceIncomingBluetooth();
         serviceAlarmVolume();
         serviceAudioTest();
         if (!isRinging) {
@@ -207,6 +208,7 @@ bool playWavFile(const char* path) {
         if (outIdx >= 256) {
             serviceWifi();
             serviceAlarmVolume();
+            serviceIncomingBluetooth();
             serviceAudioTest();
             if (!isRinging) {
                 f.close();

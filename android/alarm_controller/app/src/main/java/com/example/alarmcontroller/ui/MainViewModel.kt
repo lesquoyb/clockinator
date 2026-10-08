@@ -23,6 +23,7 @@ import com.example.alarmcontroller.communication.SyncPayload
 import com.example.alarmcontroller.communication.sendAndAwaitUploadAck
 import com.example.alarmcontroller.communication.ble.BleDeviceItem
 import com.example.alarmcontroller.communication.ble.BleManager
+import com.example.alarmcontroller.communication.ble.ClockPresenceReceiver
 import com.example.alarmcontroller.communication.wifi.WifiCommunicator
 import com.example.alarmcontroller.lock.LockModeManager
 import kotlinx.coroutines.delay
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.channels.Channel
@@ -131,16 +133,81 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------
 
     private val _hasPendingSync = MutableStateFlow(false)
+    private val lastSyncSent = MutableStateFlow(0L)
     val hasPendingSync: StateFlow<Boolean> = _hasPendingSync.asStateFlow()
 
     private val _autoSyncHours = MutableStateFlow(alarmRepository.getAutoSyncHours())
     val autoSyncHours: StateFlow<Int> = _autoSyncHours.asStateFlow()
+    val backgroundSyncEnabled = MutableStateFlow(alarmRepository.backgroundSyncEnabled())
+    val displayRefreshMinutes = MutableStateFlow(alarmRepository.displayRefreshMinutes())
+    fun setDisplayRefreshMinutes(minutes: Int) {
+        require(minutes in 0..1440)
+        alarmRepository.setDisplayRefreshMinutes(minutes)
+        displayRefreshMinutes.value = minutes
+        if (isDeviceConnected()) viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildDisplayRefreshSettings(minutes))
+            if (result.isFailure) _statusAlert.value = "Display setting saved; it will apply on the next sync."
+        }
+    }
+    fun refreshClockDisplay() {
+        if (!isDeviceConnected()) return
+        viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildRefreshDisplay())
+            if (result.isFailure) _statusAlert.value = "Could not request a screen refresh."
+        }
+    }
+    val wifiSyncEnabled = MutableStateFlow(alarmRepository.wifiSyncEnabled())
+    fun setWifiSyncEnabled(enabled: Boolean) {
+        alarmRepository.setWifiSyncEnabled(enabled)
+        wifiSyncEnabled.value = enabled
+        wifiCommunicator.setEnabled(enabled)
+        wifiNetworkCallback?.let { runCatching { connectivityManager.unregisterNetworkCallback(it) } }
+        wifiNetworkCallback = null
+        synchronized(autoWifiLock) { lastAutoWifiNetwork = null }
+        _statusAlert.value = null
+        if (enabled) registerWifiReconnect()
+    }
+    val clockStatusEnabled = MutableStateFlow(alarmRepository.clockStatusEnabled())
+
+    fun setBackgroundSyncEnabled(enabled: Boolean) {
+        alarmRepository.setBackgroundSyncEnabled(enabled)
+        backgroundSyncEnabled.value = enabled
+        com.example.alarmcontroller.communication.ble.BackgroundClockSync.schedule(getApplication())
+    }
+    fun setClockStatusEnabled(enabled: Boolean) {
+        alarmRepository.setClockStatusEnabled(enabled)
+        com.example.alarmcontroller.communication.ble.ClockStatusService.apply(getApplication())
+        clockStatusEnabled.value = alarmRepository.clockStatusEnabled()
+    }
+    fun retryBackgroundConnection() {
+        if (connectionState.value !is ConnectionState.Connected &&
+            connectionState.value !is ConnectionState.Connecting) {
+            alarmRepository.getLastBleMac()?.let { if (bleManager.isBluetoothEnabled) bleManager.reconnectInBackground(it) }
+        }
+    }
+    suspend fun syncInBackground(): Boolean {
+        if (!isDeviceConnected()) {
+            val previous = lastSyncSent.value
+            retryBackgroundConnection()
+            // The connection collector already sends the initial sync. Wait for
+            // that send rather than sending twice and flashing the e-paper twice.
+            lastSyncSent.first { it > previous }
+            return true
+        }
+        loadAlarms()
+        _ringtoneVolumeLevel.value = alarmRepository.getRingtoneVolume()
+        val sent = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value, alarmRepository.displayRefreshMinutes())).isSuccess
+        _hasPendingSync.value = !sent
+        if (sent) lastSyncSent.value = android.os.SystemClock.elapsedRealtimeNanos()
+        return sent
+    }
 
     // ------------------------------------------------------------------
     // init
     // ------------------------------------------------------------------
 
     init {
+        wifiCommunicator.setEnabled(wifiSyncEnabled.value)
         loadAlarms()
 
         viewModelScope.launch {
@@ -176,6 +243,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             bleManager.connectionState.collect { state ->
                 if (state is ConnectionState.Connected) {
                     alarmRepository.saveLastBleMac(state.address)
+                    ClockPresenceReceiver.dismiss(application)
+                    ClockPresenceReceiver.watch(application)
                     delay(1_000)
                     pendingWifiCredentials?.let { (ssid, password) ->
                         val result = bleManager.sendMessage(SyncPayload.buildWifiConfig(ssid, password))
@@ -192,7 +261,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val mac = alarmRepository.getLastBleMac()
             if (mac != null && bleManager.isBluetoothEnabled) {
                 delay(1_500)
-                bleManager.reconnectInBackground(mac)
+                retryBackgroundConnection()
             }
         }
 
@@ -262,6 +331,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (level in 1..5) _confirmedVolumeLevel.value = level
             }
             SyncPayload.ACTION_WIFI_STATUS -> {
+                if (!wifiSyncEnabled.value) return
                 when (json.optString("status")) {
                     "connecting" -> {
                         val ssid = json.optString("ssid").ifBlank { "Wi-Fi network" }
@@ -477,9 +547,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             loadAlarms()
-            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value))
+            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value, displayRefreshMinutes.value))
             if (result.isSuccess) {
                 _hasPendingSync.value = false
+                lastSyncSent.value = android.os.SystemClock.elapsedRealtimeNanos()
                 _messages.update { it + DeviceMessage(
                     text = "[Sync] ${_alarms.value.size} alarm(s) pushed to device.",
                     direction = MessageDirection.TX
@@ -851,6 +922,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun retryWifiConnection() {
+        if (!wifiSyncEnabled.value) return
         val ip = _lastEspWifiIp.value
         if (ip == null) {
             _statusAlert.value = "Connect to the clock over Bluetooth once to discover its Wi-Fi address."
@@ -873,7 +945,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun sendToDevice(message: String): Result<Unit> {
-        if (wifiCommunicator.connectionState.value is ConnectionState.Connected) {
+        if (wifiSyncEnabled.value && wifiCommunicator.connectionState.value is ConnectionState.Connected) {
             val wifiResult = wifiCommunicator.sendMessage(message)
             if (wifiResult.isSuccess) return wifiResult
         }
@@ -885,6 +957,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             wifiCommunicator.connectionState.value is ConnectionState.Connected
 
     private fun registerWifiReconnect() {
+        if (!wifiSyncEnabled.value || wifiNetworkCallback != null) return
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 tryReconnectOnSharedWifi(network)
@@ -912,6 +985,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun tryReconnectOnSharedWifi(network: Network) {
+        if (!wifiSyncEnabled.value) return
         val ip = _lastEspWifiIp.value ?: return
         val configuredSsid = alarmRepository.getLastWifiSsid()?.trim()?.trim('"') ?: return
         if (wifiCommunicator.currentWifiSsid()?.trim()?.trim('"') != configuredSsid) return

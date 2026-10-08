@@ -84,13 +84,22 @@ object SyncPayload {
 
     fun buildStopRingtoneTest(): String = JSONObject().put("action", "STOP_TEST_RINGTONE").toString()
 
-    fun buildPushSyncJson(alarms: List<AlarmItem>, volumeLevel: Int = 3): String {
+    fun buildRefreshDisplay(): String = JSONObject().put("action", "REFRESH_DISPLAY").toString()
+
+    fun buildDisplayRefreshSettings(minutes: Int): String {
+        require(minutes in 0..1440)
+        return JSONObject().put("action", "SET_DISPLAY_REFRESH").put("minutes", minutes).toString()
+    }
+
+    fun buildPushSyncJson(alarms: List<AlarmItem>, volumeLevel: Int = 3, displayRefreshMinutes: Int = 0): String {
         require(volumeLevel in 1..5)
+        require(displayRefreshMinutes in 0..1440)
         val now = System.currentTimeMillis()
         val tz  = TimeZone.getDefault()
         return JSONObject().apply {
             put("action", ACTION_SYNC)
             put("volumeLevel", volumeLevel)
+            put("displayRefreshMinutes", displayRefreshMinutes)
             put("timestamp", now / 1000)
             put("utcOffsetSec", tz.getOffset(now) / 1_000)
             val arr = JSONArray()

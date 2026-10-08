@@ -821,6 +821,10 @@ fun SettingsTab(
     val isVolumeTestPlaying by viewModel.isVolumeTestPlaying.collectAsState()
     val lastEspWifiIp by viewModel.lastEspWifiIp.collectAsState()
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
+    val backgroundSync by viewModel.backgroundSyncEnabled.collectAsState()
+    val displayRefreshMinutes by viewModel.displayRefreshMinutes.collectAsState()
+    val wifiSync by viewModel.wifiSyncEnabled.collectAsState()
+    val clockStatus by viewModel.clockStatusEnabled.collectAsState()
     val uploadedRingtones by viewModel.uploadedRingtones.collectAsState()
     val uploadState       by viewModel.uploadState.collectAsState()
     val isLocked          by viewModel.lockModeManager.isLocked.collectAsState()
@@ -865,6 +869,10 @@ fun SettingsTab(
         var wifiSsid by rememberSaveable { mutableStateOf("") }
         var wifiPassword by rememberSaveable { mutableStateOf("") }
         SettingsSection(title = "Local Wi-Fi") {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Wi-Fi connection and sync", modifier = Modifier.weight(1f))
+                Switch(checked = wifiSync, onCheckedChange = viewModel::setWifiSyncEnabled)
+            }
             Text(
                 when (wifiConnectionState) {
                     is ConnectionState.Connected -> "ESP32 reachable over Wi-Fi"
@@ -884,7 +892,7 @@ fun SettingsTab(
             )
             Button(
                 onClick = { viewModel.configureWifi(wifiSsid, wifiPassword) },
-                enabled = isConnected && wifiSsid.isNotBlank(),
+                enabled = wifiSync && isConnected && wifiSsid.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -893,7 +901,7 @@ fun SettingsTab(
             }
             OutlinedButton(
                 onClick = { viewModel.retryWifiConnection() },
-                enabled = lastEspWifiIp != null && wifiConnectionState !is ConnectionState.Connecting,
+                enabled = wifiSync && lastEspWifiIp != null && wifiConnectionState !is ConnectionState.Connecting,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1009,7 +1017,50 @@ fun SettingsTab(
         }
 
         // ── Auto-sync ─────────────────────────────────────────────────
+        Text("Clockinator " + com.example.alarmcontroller.BuildConfig.VERSION_NAME,
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SettingsSection(title = "Clock screen") {
+            OutlinedButton(onClick = viewModel::refreshClockDisplay, enabled = canSendToDevice,
+                modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Full screen refresh now")
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Periodic full refresh")
+                    Text("Off by default. The clock cleans the screen once after its first sync.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = displayRefreshMinutes > 0,
+                    onCheckedChange = { viewModel.setDisplayRefreshMinutes(if (it) 30 else 0) })
+            }
+            if (displayRefreshMinutes > 0) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(listOf(10, 30, 60, 120)) { minutes ->
+                        FilterChip(selected = displayRefreshMinutes == minutes,
+                            onClick = { viewModel.setDisplayRefreshMinutes(minutes) },
+                            label = { Text("${minutes} min") })
+                    }
+                }
+            }
+        }
+
         SettingsSection(title = "Auto-sync") {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Background checks")
+                    Text("Silent checks about every 15 minutes; Android may delay them.", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = backgroundSync, onCheckedChange = viewModel::setBackgroundSyncEnabled)
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Persistent clock status")
+                    Text("Keeps the connection active with a silent status notification.", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = clockStatus, onCheckedChange = viewModel::setClockStatusEnabled)
+            }
             Text("Automatically push alarms to the device every N hours. If the device is unreachable the sync is queued and retried on next connection.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))

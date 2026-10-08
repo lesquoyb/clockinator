@@ -24,13 +24,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.example.alarmcontroller.communication.ble.BleAutoConnectService
+import com.example.alarmcontroller.communication.ble.ClockPresenceReceiver
 import com.example.alarmcontroller.ui.MainScreen
 import com.example.alarmcontroller.ui.MainViewModel
 import com.example.alarmcontroller.ui.theme.AlarmControllerTheme
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by lazy { (application as ClockApplication).clockModel() }
     private var nfcAdapter: NfcAdapter? = null
 
     // Tracks whether the app is currently in write-tag mode (set from NfcTagConfigScreen)
@@ -56,8 +57,6 @@ class MainActivity : ComponentActivity() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         checkNfcIntent(intent)
 
-        // Start the BLE background service so autoConnect keeps working when the
-        // app is not in the foreground.
         // Retire the old waiting notification, including an already running service.
         BleAutoConnectService.stop(this)
 
@@ -70,6 +69,10 @@ class MainActivity : ComponentActivity() {
                 ) { map -> hasPermissions = map.values.all { it } }
 
                 LaunchedEffect(hasPermissions) {
+                    if (hasPermissions) {
+                        ClockPresenceReceiver.watch(this@MainActivity)
+                        com.example.alarmcontroller.communication.ble.ClockStatusService.apply(this@MainActivity)
+                    }
                     if (hasPermissions && !viewModel.isBluetoothEnabled) {
                         try {
                             startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
@@ -88,6 +91,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        ClockPresenceReceiver.visible = true
+        ClockPresenceReceiver.dismiss(this)
         // Enable foreground NFC dispatch so the activity gets priority over all tags
         val pi = PendingIntent.getActivity(
             this, 0,
@@ -99,6 +104,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        ClockPresenceReceiver.visible = false
         nfcAdapter?.disableForegroundDispatch(this)
     }
 

@@ -1,6 +1,11 @@
   const int iconSize = 64;
 #include "globals.h"
 #include <GxEPD2_BW.h>
+#include <Preferences.h>
+#include "DisplayRefreshPolicy.h"
+
+static DisplayRefreshPolicy refreshPolicy;
+static unsigned refreshMinutes = 0;
 #include <Fonts/FreeMonoBold12pt7b.h>
 
 
@@ -88,6 +93,12 @@ GxEPD2_BW<GxEPD2_370_GDEY037T03, GxEPD2_370_GDEY037T03::HEIGHT> display(
 );
 
 void initDisplay(){
+  Preferences prefs;
+  prefs.begin("display", true);
+  refreshMinutes = prefs.getUInt("refreshMinutes", 0);
+  prefs.end();
+  if (refreshMinutes > 1440) refreshMinutes = 0;
+  refreshPolicy.setMinutes(refreshMinutes);
   display.init(115200);
   display.setRotation(1); // Landscape
 }
@@ -117,6 +128,28 @@ void show(const char *line1, const char *line2) {
     was_previously_drawing = false;
 }
 
+static bool fullClockRefreshRequested = true;
+time_t lastClockMinute = -1;
+
+void requestFullClockRefresh() { fullClockRefreshRequested = true; }
+void queueInitialClockRefresh() { refreshPolicy.synchronized(millis()); }
+void noteClockLinkChange() { refreshPolicy.linkChanged(millis()); }
+void setDisplayRefreshMinutes(unsigned minutes) {
+  if (minutes > 1440 || minutes == refreshMinutes) return;
+  refreshMinutes = minutes;
+  refreshPolicy.setMinutes(minutes);
+  Preferences prefs;
+  prefs.begin("display", false);
+  prefs.putUInt("refreshMinutes", minutes);
+  prefs.end();
+}
+void serviceClockRefresh() {
+  if (refreshPolicy.due(millis(), clockConnectionsReadyForRefresh())) {
+    requestFullClockRefresh();
+    drawClock();
+  }
+}
+
 void drawClock() {
 
   time_t now = start_time + (millis() / 1000);
@@ -126,10 +159,12 @@ void drawClock() {
 
   char buffer[6];
   strftime(buffer, sizeof(buffer), "%H:%M", &timeinfo);
+  if (start_time == 0) strcpy(buffer, "--:--");
 
   // If previous use of the display was to draw a raw message then we redraw everything
   // otherwise partial redraw
-  if ( ! was_previously_drawing){
+  const bool fullRefresh = !was_previously_drawing || fullClockRefreshRequested;
+  if (fullRefresh){
     display.setFullWindow();
   }
   else {
@@ -168,8 +203,6 @@ void drawClock() {
     display.setTextSize(2);
     display.setCursor(10, display.height() - 25);
     display.print("Vol ");
-    display.print(getAlarmVolume());
-    display.print("/5");
     for (int level = 1; level <= 5; ++level) {
       const int h = level * 4;
       const int x = 115 + (level - 1) * 14;
@@ -186,7 +219,16 @@ void drawClock() {
 
     // Draw the active wireless links inside the panel bounds.
     if (is_wifi_connected){
-      display.drawBitmap(wifiX, iconY, ICON_WIFI, iconSize, iconSize, GxEPD_BLACK);
+      // Solid four-pixel arcs stay legible on the e-paper panel.
+      const int cx = wifiX + 24, cy = iconY + 32;
+      display.fillCircle(cx, cy, 22, GxEPD_BLACK);
+      display.fillCircle(cx, cy, 18, GxEPD_WHITE);
+      display.fillCircle(cx, cy, 13, GxEPD_BLACK);
+      display.fillCircle(cx, cy, 9, GxEPD_WHITE);
+      // The circles extend beyond the icon and the panel's bottom edge.
+      // Clear all remaining rows before drawing the dot, including rows 238/239.
+      display.fillRect(wifiX, cy, iconSize, display.height() - cy, GxEPD_WHITE);
+      display.fillCircle(cx, cy + 7, 3, GxEPD_BLACK);
     }
     if (is_bluetooth_connected){
       display.drawBitmap(bluetoothX, iconY, ICON_BLUETOOTH, iconSize, iconSize, GxEPD_BLACK);
@@ -195,6 +237,9 @@ void drawClock() {
   } while (display.nextPage());
 
   was_previously_drawing = true;
+  lastClockMinute = now / 60;
+  fullClockRefreshRequested = false;
+  if (fullRefresh) refreshPolicy.refreshed(millis(), clockConnectionsReadyForRefresh());
 }
 
 

@@ -4,6 +4,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <LittleFS.h>
+#include "ClockTime.h"
 
 /*
  * bluetooth.ino
@@ -214,7 +215,7 @@ static void parseAndStoreAlarm(JsonObject obj) {
 }
 
 /* -------------------------------------------------------------------------
- * Shared command parser called by BLE callbacks and the TCP main loop.
+ * Shared command parser. Only the main loop / audio task calls it.
  * -------------------------------------------------------------------------*/
 void processIncomingCommand(String raw) {
         if (raw.length() == 0) return;
@@ -233,13 +234,28 @@ void processIncomingCommand(String raw) {
         }
 
         /* Update local clock */
-        if (doc.containsKey("timestamp")) {
+        if (doc["timestamp"].is<long long>()) {
             long long ts      = doc["timestamp"].as<long long>();
             long      utcOff  = doc["utcOffsetSec"] | 0L;
-            start_time = (time_t)(ts + utcOff) - (time_t)(millis() / 1000);
+            // Ignore zero, malformed dates and invalid UTC offsets instead of
+            // replacing a synchronized clock with time since boot.
+            int64_t base;
+            if (clockBaseFromSync(ts, utcOff, millis() / 1000, base)) {
+                start_time = (time_t)base;
+                queueInitialClockRefresh();
+                postCommand(CMD_SYNC_PUSH);
+            }
         }
 
         const char* action = doc["action"] | "";
+        if (strcmp(action, "REFRESH_DISPLAY") == 0) {
+            postCommand(CMD_DISPLAY_REFRESH);
+            return;
+        }
+        if (strcmp(action, "SET_DISPLAY_REFRESH") == 0) {
+            if (doc["minutes"].is<unsigned>()) setDisplayRefreshMinutes(doc["minutes"].as<unsigned>());
+            return;
+        }
 
         if (strcmp(action, A_WIFI_CONFIG) == 0) {
             const char* ssid = doc["ssid"] | "";
@@ -267,6 +283,8 @@ void processIncomingCommand(String raw) {
 
         /* ---- SYNC -------------------------------------------- */
         if (strcmp(action, A_SYNC) == 0 && doc.containsKey("alarms")) {
+            if (doc["displayRefreshMinutes"].is<unsigned>())
+                setDisplayRefreshMinutes(doc["displayRefreshMinutes"].as<unsigned>());
             if (doc["volumeLevel"].is<int>()) requestAlarmVolume(doc["volumeLevel"].as<int>());
             alarms.clear();
             for (JsonObject obj : doc["alarms"].as<JsonArray>())
@@ -420,9 +438,23 @@ void processIncomingCommand(String raw) {
         }
 }
 
+static QueueHandle_t incomingBluetoothQueue;
+
+void serviceIncomingBluetooth() {
+    char* raw = nullptr;
+    while (incomingBluetoothQueue &&
+           xQueueReceive(incomingBluetoothQueue, &raw, 0) == pdTRUE) {
+        processIncomingCommand(String(raw));
+        free(raw);
+    }
+}
+
 class RXCallbacks : public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic* ch) override {
-        processIncomingCommand(ch->getValue());
+        const String value = ch->getValue();
+        if (!incomingBluetoothQueue || value.length() == 0 || value.length() > 8192) return;
+        char* raw = strdup(value.c_str());
+        if (raw && xQueueSend(incomingBluetoothQueue, &raw, 0) != pdTRUE) free(raw);
     }
 };
 
@@ -444,6 +476,7 @@ class ServerCallbacks : public BLEServerCallbacks {
  * initBluetoothServer
  * -------------------------------------------------------------------------*/
 void initBluetoothServer() {
+    incomingBluetoothQueue = xQueueCreate(8, sizeof(char*));
     BLEDevice::init(DEVICE_NAME);
 
     BLEServer* server = BLEDevice::createServer();

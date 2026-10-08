@@ -2,3 +2,8 @@
 /android/alarm_controller/.idea
 /android/alarm_controller/app/build
 /android/alarm_controller/.kotlin
+/dist/
+/esp32/**/build/
+*.jks
+*.keystore
+**/__pycache__/

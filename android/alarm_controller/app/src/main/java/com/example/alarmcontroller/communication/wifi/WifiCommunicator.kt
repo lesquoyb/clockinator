@@ -31,6 +31,8 @@ import java.net.Socket
 import java.nio.charset.StandardCharsets
 
 class WifiCommunicator(context: Context) : DeviceCommunicator {
+    @Volatile private var enabled = true
+    fun setEnabled(value: Boolean) { enabled = value; if (!value) disconnect() }
 
     companion object {
         private const val PORT = 4210
@@ -44,10 +46,12 @@ class WifiCommunicator(context: Context) : DeviceCommunicator {
     override val incomingMessages: SharedFlow<DeviceMessage> = _incomingMessages.asSharedFlow()
 
     fun reportConnecting(target: String) {
+        if (!enabled) return
         _connectionState.value = ConnectionState.Connecting(target)
     }
 
     fun reportError(message: String) {
+        if (!enabled) return
         disconnect()
         _connectionState.value = ConnectionState.Error(message)
     }
@@ -62,6 +66,7 @@ class WifiCommunicator(context: Context) : DeviceCommunicator {
 
 
     suspend fun connect(target: String, preferredNetwork: Network?): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!enabled) return@withContext Result.failure(IllegalStateException("Wi-Fi sync is disabled"))
         disconnect()
         _connectionState.value = ConnectionState.Connecting("$target:$PORT via Wi-Fi")
         val wifiNetwork = preferredNetwork ?: findWifiNetwork()
@@ -71,10 +76,12 @@ class WifiCommunicator(context: Context) : DeviceCommunicator {
             return@withContext Result.failure(IllegalStateException(message))
         }
         val newSocket = Socket()
+        socket = newSocket // disconnect() can also cancel an in-flight connection.
         try {
             wifiNetwork.bindSocket(newSocket)
             newSocket.connect(InetSocketAddress(target, PORT), CONNECT_TIMEOUT_MS)
             newSocket.tcpNoDelay = true
+            if (!enabled) { newSocket.close(); return@withContext Result.failure(IllegalStateException("Wi-Fi sync is disabled")) }
             socket = newSocket
             _connectionState.value = ConnectionState.Connected("Clockinator Wi-Fi", target)
             readerJob = scope.launch { readMessages(newSocket) }
@@ -84,7 +91,7 @@ class WifiCommunicator(context: Context) : DeviceCommunicator {
             val message = "TCP connection to ESP32 at $target:$PORT via Wi-Fi failed: " +
                 (error.localizedMessage ?: error.javaClass.simpleName) + ". " +
                 describeWifiRoute(wifiNetwork)
-            _connectionState.value = ConnectionState.Error(message)
+            if (enabled) _connectionState.value = ConnectionState.Error(message)
             Result.failure(error)
         }
     }

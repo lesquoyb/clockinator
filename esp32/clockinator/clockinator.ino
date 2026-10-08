@@ -12,11 +12,10 @@
  *
  * Thread-safety model
  * -------------------
- * Core 0: BLE RTOS task (bluetooth.ino callbacks). Must NOT touch SPI
- *         (e-paper) or I2S (speaker) directly. Posts PendingCommand items
- *         into cmdQueue instead.
+ * Core 0: BLE callbacks queue incoming payloads and connection events.
+ *         They do not mutate the clock, alarm map, SPI or I2S state.
  * Core 1: Arduino loop(). Owns the display and the I2S driver. Drains
- *         cmdQueue at the top of every iteration and executes the commands.
+ *         incoming payloads and cmdQueue, including payloads during audio.
  *
  * Shared state accessed from both cores uses 'volatile' where a single
  * word-sized read/write is sufficient. Multi-field updates are protected
@@ -46,6 +45,15 @@ static bool wasWifiConnected = false;
 static bool wifiProvisioningAttemptActive = false;
 static uint32_t wifiProvisioningStartedAt = 0;
 static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 20000;
+static bool wifiInitialConnectionExpected = false;
+static uint32_t wifiInitializationStartedAt = 0;
+
+bool clockConnectionsReadyForRefresh() {
+    if ((WiFi.status() == WL_CONNECTED) != is_wifi_connected) return false;
+    return !wifiProvisioningAttemptActive && (!wifiInitialConnectionExpected ||
+        WiFi.status() == WL_CONNECTED ||
+        millis() - wifiInitializationStartedAt >= WIFI_CONNECT_TIMEOUT_MS);
+}
 
 /* Post a command from any task/core without blocking. */
 void postCommand(PendingCommandType type, int minutes) {
@@ -192,6 +200,7 @@ void snoozeAlarm(int minutes) {
 static bool drainCommandQueue() {
     PendingCommand cmd;
     bool anyProcessed = false;
+    bool redraw = false;
 
     while (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) {
         anyProcessed = true;
@@ -203,22 +212,26 @@ static bool drainCommandQueue() {
                 snoozeAlarm(cmd.minutes);
                 break;
             case CMD_SYNC_PUSH:
-                /* Alarm list was updated by the BLE task; recalculate. */
+                /* Incoming messages were applied on this core; recalculate. */
                 setNextAlarm();
-                drawClock();
+                redraw = true;
                 break;
             case CMD_BLE_CONNECTED:
                 is_bluetooth_connected = true;
-                drawClock();
+                noteClockLinkChange();
+                redraw = true;
                 break;
             case CMD_BLE_DISCONNECTED:
                 is_bluetooth_connected = false;
-                drawClock();
+                noteClockLinkChange();
+                redraw = true;
                 break;
             default:
+                if (cmd.type == CMD_DISPLAY_REFRESH) { requestFullClockRefresh(); redraw = true; }
                 break;
         }
     }
+    if (redraw) drawClock();
     return anyProcessed;
 }
 
@@ -240,7 +253,9 @@ void initWifi() {
     String password = preferences.getString("password", "");
     preferences.end();
 
-    if (ssid.length() > 0) WiFi.begin(ssid.c_str(), password.c_str());
+    wifiInitialConnectionExpected = ssid.length() > 0;
+    wifiInitializationStartedAt = millis();
+    if (wifiInitialConnectionExpected) WiFi.begin(ssid.c_str(), password.c_str());
 }
 
 void notifyWifiClient(const char* message) {
@@ -257,6 +272,7 @@ void notifyWifiStatus() {
     bool connected = WiFi.status() == WL_CONNECTED;
     JsonDocument document;
     document["action"] = "WIFI_STATUS";
+    document["firmwareVersion"] = CLOCKINATOR_VERSION;
     document["status"] = connected ? "connected" : "disconnected";
     document["connected"] = connected;
     if (connected) document["ip"] = WiFi.localIP().toString();
@@ -326,6 +342,7 @@ void serviceWifi() {
     if (connected != wasWifiConnected) {
         wasWifiConnected = connected;
         is_wifi_connected = connected;
+        noteClockLinkChange();
         if (connected) {
             wifiProvisioningAttemptActive = false;
             if (pendingWifiCredentialsValid) {
@@ -417,22 +434,22 @@ void setup() {
     initBluetoothServer();
 }
 
-static time_t last_update = 0;
-
 void loop() {
+    serviceIncomingBluetooth();
+    serviceAlarmVolume();
     /* Drain any commands posted by the BLE task first. */
     drainCommandQueue();
     serviceWifi();
     serviceAlarmVolume();
     serviceAudioTest();
     refreshVolumeDisplay();
+    serviceClockRefresh();
 
     time_t now = start_time + (time_t)(millis() / 1000);
 
     /* Refresh the clock independently of alarm playback. */
-    if (now / 60 != last_update / 60) {
+    if (now / 60 != lastClockMinute) {
         drawClock();
-        last_update = now;
     }
 
     // A scheduled alarm takes priority over a volume preview.
