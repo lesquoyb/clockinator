@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.channels.Channel
@@ -77,6 +79,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isScanning:       StateFlow<Boolean>             = bleManager.isScanning
     val isBluetoothEnabled: Boolean get() = bleManager.isBluetoothEnabled
     val wifiConnectionState: StateFlow<ConnectionState> = wifiCommunicator.connectionState
+    private val _ringtoneVolumeLevel = MutableStateFlow(alarmRepository.getRingtoneVolume())
+    val ringtoneVolumeLevel = _ringtoneVolumeLevel.asStateFlow()
+    private val _confirmedVolumeLevel = MutableStateFlow<Int?>(null)
+    val confirmedVolumeLevel = _confirmedVolumeLevel.asStateFlow()
+    private val _isVolumeTestPlaying = MutableStateFlow(false)
+    val isVolumeTestPlaying = _isVolumeTestPlaying.asStateFlow()
+
     val lastEspWifiIp: StateFlow<String?> = _lastEspWifiIp.asStateFlow()
     private val autoWifiLock = Any()
     private var lastAutoWifiNetwork: Network? = null
@@ -133,6 +142,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadAlarms()
+
+        viewModelScope.launch {
+            combine(connectionState, wifiConnectionState) { ble, wifi ->
+                ble is ConnectionState.Connected || wifi is ConnectionState.Connected
+            }.distinctUntilChanged().collect { connected ->
+                if (!connected) {
+                    _confirmedVolumeLevel.value = null
+                    _isVolumeTestPlaying.value = false
+                }
+            }
+        }
 
         // 1. Collect incoming BLE messages
         viewModelScope.launch {
@@ -231,6 +251,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val ringtone = RingtoneType.fromWire(json.optString("ringtone"))
 
         when (action) {
+            "AUDIO_TEST_STATUS" -> {
+                val status = json.optString("status")
+                _isVolumeTestPlaying.value = status == "playing"
+                if (status == "busy") _statusAlert.value = "The clock is already ringing. Stop it before testing."
+                if (status == "error") _statusAlert.value = "The clock could not open this ringtone."
+            }
+            "VOLUME_STATUS" -> {
+                val level = json.optInt("level", 0)
+                if (level in 1..5) _confirmedVolumeLevel.value = level
+            }
             SyncPayload.ACTION_WIFI_STATUS -> {
                 when (json.optString("status")) {
                     "connecting" -> {
@@ -447,7 +477,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             loadAlarms()
-            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value))
+            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value))
             if (result.isSuccess) {
                 _hasPendingSync.value = false
                 _messages.update { it + DeviceMessage(
@@ -457,6 +487,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 _hasPendingSync.value = true
             }
+        }
+    }
+
+    fun setRingtoneVolume(level: Int) {
+        if (level !in 1..5) return
+        alarmRepository.setRingtoneVolume(level)
+        _ringtoneVolumeLevel.value = level
+        _confirmedVolumeLevel.value = null
+        if (!isDeviceConnected()) {
+            _hasPendingSync.value = true
+            return
+        }
+        viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildSetVolume(_ringtoneVolumeLevel.value))
+            if (result.isFailure) {
+                _hasPendingSync.value = true
+                _statusAlert.value = "Volume saved. Reconnect or sync to apply it to the clock."
+            }
+        }
+    }
+
+    fun testClockRingtone(filename: String?) {
+        if (!isDeviceConnected()) return
+        viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildTestRingtone(filename))
+            if (result.isFailure) _statusAlert.value = "Could not start the clock ringtone test."
+        }
+    }
+
+    fun stopClockRingtoneTest() {
+        viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildStopRingtoneTest())
+            if (result.isFailure) _statusAlert.value = "Could not stop the test. It stops automatically after 5 seconds."
         }
     }
 

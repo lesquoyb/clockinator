@@ -13,7 +13,7 @@
 // Text properties
 #define SHOW_TEXT_SIZE  1
 #define CLOCK_SIZE      13
-#define ALARM_TEXT_SIZE 4
+#define ALARM_TEXT_SIZE 3
 
 
 // Icons 48x48, 288 bytes
@@ -152,7 +152,7 @@ void drawClock() {
 
     // Now writing the next alarm at the bottom
     display.setTextSize(ALARM_TEXT_SIZE);
-    display.setCursor(10, 200);
+    display.setCursor(10, 174);
 
     if (next_alarm > 0) {
       char alarm_buff[13];
@@ -163,6 +163,19 @@ void drawClock() {
     }
     else {
       display.print("No alarm set");
+    }
+
+    display.setTextSize(2);
+    display.setCursor(10, display.height() - 25);
+    display.print("Vol ");
+    display.print(getAlarmVolume());
+    display.print("/5");
+    for (int level = 1; level <= 5; ++level) {
+      const int h = level * 4;
+      const int x = 115 + (level - 1) * 14;
+      const int y = display.height() - 9 - h;
+      if (level <= getAlarmVolume()) display.fillRect(x, y, 10, h, GxEPD_BLACK);
+      else display.drawRect(x, y, 10, h, GxEPD_BLACK);
     }
 
       // Draw the client state

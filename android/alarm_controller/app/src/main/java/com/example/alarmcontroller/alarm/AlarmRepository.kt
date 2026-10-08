@@ -146,6 +146,11 @@ class AlarmRepository(context: Context) {
     // Periodic auto-sync
     // ------------------------------------------------------------------
 
+    fun getRingtoneVolume(): Int = prefs.getInt("ringtone_volume_level", 3).coerceIn(1, 5)
+    fun setRingtoneVolume(level: Int) {
+        prefs.edit().putInt("ringtone_volume_level", level.coerceIn(1, 5)).apply()
+    }
+
     fun getAutoSyncHours(): Int = prefs.getInt(KEY_AUTO_SYNC_HOURS, DEFAULT_AUTO_SYNC_HOURS)
     fun setAutoSyncHours(hours: Int) {
         prefs.edit().putInt(KEY_AUTO_SYNC_HOURS, hours.coerceAtLeast(0)).apply()

@@ -58,7 +58,8 @@ class MainActivity : ComponentActivity() {
 
         // Start the BLE background service so autoConnect keeps working when the
         // app is not in the foreground.
-        BleAutoConnectService.start(this)
+        // Retire the old waiting notification, including an already running service.
+        BleAutoConnectService.stop(this)
 
         setContent {
             AlarmControllerTheme {

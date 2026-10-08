@@ -111,8 +111,7 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!-- Foreground Service that keeps the BLE autoConnect watch alive
-             when the app is not in the foreground. -->
+        <!-- Migration stub: retires the former sticky waiting notification. -->
         <service
             android:name=".communication.ble.BleAutoConnectService"
             android:exported="false"

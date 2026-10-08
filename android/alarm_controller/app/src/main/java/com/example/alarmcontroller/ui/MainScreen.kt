@@ -816,6 +816,9 @@ fun SettingsTab(
     onWriteNfcTag: (String) -> Unit,
     onOpenDevice: () -> Unit
 ) {
+    val volumeLevel by viewModel.ringtoneVolumeLevel.collectAsState()
+    val confirmedVolume by viewModel.confirmedVolumeLevel.collectAsState()
+    val isVolumeTestPlaying by viewModel.isVolumeTestPlaying.collectAsState()
     val lastEspWifiIp by viewModel.lastEspWifiIp.collectAsState()
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
     val uploadedRingtones by viewModel.uploadedRingtones.collectAsState()
@@ -851,6 +854,12 @@ fun SettingsTab(
             Text(if (canSendToDevice) "Connected and syncing alarms" else "Not connected",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = onOpenDevice) { Text("Manage connection") }
+        }
+
+        SettingsSection(title = "Clock ringtone volume") {
+            ClockVolumeControl(volumeLevel, confirmedVolume, canSendToDevice, viewModel::setRingtoneVolume,
+                uploadedRingtones.sorted(), isVolumeTestPlaying,
+                viewModel::testClockRingtone, viewModel::stopClockRingtoneTest)
         }
 
         var wifiSsid by rememberSaveable { mutableStateOf("") }

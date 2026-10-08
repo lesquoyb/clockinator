@@ -248,8 +248,26 @@ void processIncomingCommand(String raw) {
             return;
         }
 
+        if (strcmp(action, "SET_VOLUME") == 0) {
+            if (doc["level"].is<int>()) requestAlarmVolume(doc["level"].as<int>());
+            return;
+        }
+        if (strcmp(action, "TEST_RINGTONE") == 0) {
+            requestAudioTest(doc["filename"] | "", false);
+            return;
+        }
+        if (strcmp(action, "STOP_TEST_RINGTONE") == 0) {
+            requestAudioTest("", true);
+            return;
+        }
+        if (strcmp(action, "GET_VOLUME") == 0) {
+            notifyVolumeStatus();
+            return;
+        }
+
         /* ---- SYNC -------------------------------------------- */
         if (strcmp(action, A_SYNC) == 0 && doc.containsKey("alarms")) {
+            if (doc["volumeLevel"].is<int>()) requestAlarmVolume(doc["volumeLevel"].as<int>());
             alarms.clear();
             for (JsonObject obj : doc["alarms"].as<JsonArray>())
                 parseAndStoreAlarm(obj);

@@ -1,6 +1,7 @@
 #include "globals.h"
 #include <LittleFS.h>
 #include <math.h>
+#include "AudioVolume.h"
 
 /*
  * sound.ino
@@ -52,6 +53,9 @@ static void playTone(float frequency, int durationMs) {
     int       generated = 0;
 
     while (generated < samples) {
+        serviceWifi();
+        serviceAlarmVolume();
+        serviceAudioTest();
         if (!isRinging) {
             i2s_zero_dma_buffer(I2S_PORT);
             return;
@@ -60,6 +64,7 @@ static void playTone(float frequency, int durationMs) {
         for (int i = 0; i < count; i++) {
             float   t      = (float)(generated + i) / SAMPLE_RATE;
             int16_t sample = (int16_t)(10000 * sinf(2.0f * PI * frequency * t));
+            sample = AudioVolume::scale(sample, getAlarmVolume());
             buffer[2 * i]     = sample;
             buffer[2 * i + 1] = sample;
         }
@@ -196,10 +201,13 @@ bool playWavFile(const char* path) {
             }
         }
 
-        outBuf[outIdx++] = lastL;
-        outBuf[outIdx++] = lastR;
+        outBuf[outIdx++] = AudioVolume::scale(lastL, getAlarmVolume());
+        outBuf[outIdx++] = AudioVolume::scale(lastR, getAlarmVolume());
 
         if (outIdx >= 256) {
+            serviceWifi();
+            serviceAlarmVolume();
+            serviceAudioTest();
             if (!isRinging) {
                 f.close();
                 i2s_zero_dma_buffer(I2S_PORT);

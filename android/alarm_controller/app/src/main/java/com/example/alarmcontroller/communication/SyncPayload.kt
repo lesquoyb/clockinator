@@ -72,11 +72,25 @@ object SyncPayload {
      * Only enabled alarms are included; dismissed ringtones are passed
      * so the ESP can honour one-shot skips without a full re-sync.
      */
-    fun buildPushSyncJson(alarms: List<AlarmItem>): String {
+    fun buildSetVolume(level: Int): String {
+        require(level in 1..5)
+        return JSONObject().put("action", "SET_VOLUME").put("level", level).toString()
+    }
+
+    fun buildTestRingtone(filename: String?): String = JSONObject().apply {
+        put("action", "TEST_RINGTONE")
+        put("filename", filename ?: "")
+    }.toString()
+
+    fun buildStopRingtoneTest(): String = JSONObject().put("action", "STOP_TEST_RINGTONE").toString()
+
+    fun buildPushSyncJson(alarms: List<AlarmItem>, volumeLevel: Int = 3): String {
+        require(volumeLevel in 1..5)
         val now = System.currentTimeMillis()
         val tz  = TimeZone.getDefault()
         return JSONObject().apply {
             put("action", ACTION_SYNC)
+            put("volumeLevel", volumeLevel)
             put("timestamp", now / 1000)
             put("utcOffsetSec", tz.getOffset(now) / 1_000)
             val arr = JSONArray()

@@ -73,6 +73,7 @@ volatile bool         isRinging      = false;
 volatile RingtoneType firingRingtone = RT_UNKNOWN;
 std::string           firingAlarmId;
 const char*           activeRingtoneFile = "";
+static std::string    activeRingtoneStorage;
 
 /* -------------------------------------------------------------------------
  * setNextAlarm
@@ -115,7 +116,9 @@ void setNextAlarm() {
 void startRinging() {
     auto it = alarms.find(firingAlarmId);
     if (it != alarms.end() && !it->second.ringtoneFile.empty()) {
-        activeRingtoneFile = it->second.ringtoneFile.c_str();
+        // Keep playback's path valid when a subsequent SYNC replaces the alarm map.
+        activeRingtoneStorage = it->second.ringtoneFile;
+        activeRingtoneFile = activeRingtoneStorage.c_str();
     } else {
         activeRingtoneFile = "";
     }
@@ -402,6 +405,8 @@ void setup() {
     cmdQueue = xQueueCreate(8, sizeof(PendingCommand));
     wifiConfigQueue = xQueueCreate(1, sizeof(WifiCredentials));
 
+    initAlarmVolume();
+    initAudioTest();
     setupI2S();
 
     if (!LittleFS.begin(true))
@@ -418,6 +423,9 @@ void loop() {
     /* Drain any commands posted by the BLE task first. */
     drainCommandQueue();
     serviceWifi();
+    serviceAlarmVolume();
+    serviceAudioTest();
+    refreshVolumeDisplay();
 
     time_t now = start_time + (time_t)(millis() / 1000);
 
@@ -427,6 +435,8 @@ void loop() {
         last_update = now;
     }
 
+    // A scheduled alarm takes priority over a volume preview.
+    if (next_alarm > 0 && now >= next_alarm) cancelAudioTest();
     if (!isRinging && next_alarm > 0 && now >= next_alarm) {
         firingRingtone = next_alarm_type;
         firingAlarmId  = next_alarm_id;
@@ -435,6 +445,7 @@ void loop() {
     }
 
     if (isRinging) playAlarm();
+    refreshVolumeDisplay();
 
     delay(100);
 }

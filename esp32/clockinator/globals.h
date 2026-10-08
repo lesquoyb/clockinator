@@ -177,6 +177,16 @@ void show(const char* line1, const char* line2);
 void drawClock();
 
 /* sound.ino */
+void initAlarmVolume();
+int getAlarmVolume();
+bool requestAlarmVolume(int level);
+void serviceAlarmVolume();
+void notifyVolumeStatus();
+void refreshVolumeDisplay();
+void initAudioTest();
+void requestAudioTest(const char* filename, bool stop);
+void serviceAudioTest();
+void cancelAudioTest();
 void setupI2S();
 void playAlarm();
 bool playWavFile(const char* path);
