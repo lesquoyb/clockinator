@@ -86,6 +86,9 @@ object SyncPayload {
 
     fun buildRefreshDisplay(): String = JSONObject().put("action", "REFRESH_DISPLAY").toString()
 
+    fun buildSetLight(enabled: Boolean): String =
+        JSONObject().put("action", "SET_LIGHT").put("enabled", enabled).toString()
+
     fun buildDisplayRefreshSettings(minutes: Int): String {
         require(minutes in 0..1440)
         return JSONObject().put("action", "SET_DISPLAY_REFRESH").put("minutes", minutes).toString()
@@ -107,6 +110,7 @@ object SyncPayload {
                 if (!alarm.isEnabled) continue
                 arr.put(JSONObject().apply {
                     put("id", alarm.id)
+                    put("snoozeDurations", JSONArray(alarm.snoozeDurations))
                     put("recurrence", alarm.recurrence.toJson())
                     if (alarm.lockPhone.enabled){
                         put("lock", alarm.lockPhone.toJson(RingtoneType.LOCK_PHONE))

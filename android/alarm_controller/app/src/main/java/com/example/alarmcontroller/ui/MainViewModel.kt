@@ -85,6 +85,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val ringtoneVolumeLevel = _ringtoneVolumeLevel.asStateFlow()
     private val _confirmedVolumeLevel = MutableStateFlow<Int?>(null)
     val confirmedVolumeLevel = _confirmedVolumeLevel.asStateFlow()
+    private val _clockLightOn = MutableStateFlow<Boolean?>(null)
+    val clockLightOn = _clockLightOn.asStateFlow()
     private val _isVolumeTestPlaying = MutableStateFlow(false)
     val isVolumeTestPlaying = _isVolumeTestPlaying.asStateFlow()
 
@@ -156,6 +158,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (result.isFailure) _statusAlert.value = "Could not request a screen refresh."
         }
     }
+    fun setClockLight(enabled: Boolean) {
+        if (!isDeviceConnected()) return
+        viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildSetLight(enabled))
+            if (result.isFailure) _statusAlert.value = "Could not change the clock light."
+        }
+    }
     val wifiSyncEnabled = MutableStateFlow(alarmRepository.wifiSyncEnabled())
     fun setWifiSyncEnabled(enabled: Boolean) {
         alarmRepository.setWifiSyncEnabled(enabled)
@@ -215,6 +224,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ble is ConnectionState.Connected || wifi is ConnectionState.Connected
             }.distinctUntilChanged().collect { connected ->
                 if (!connected) {
+                    _clockLightOn.value = null
                     _confirmedVolumeLevel.value = null
                     _isVolumeTestPlaying.value = false
                 }
@@ -320,6 +330,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val ringtone = RingtoneType.fromWire(json.optString("ringtone"))
 
         when (action) {
+            "LIGHT_STATUS" -> {
+                _clockLightOn.value = json.opt("enabled") as? Boolean ?: return
+            }
             "AUDIO_TEST_STATUS" -> {
                 val status = json.optString("status")
                 _isVolumeTestPlaying.value = status == "playing"

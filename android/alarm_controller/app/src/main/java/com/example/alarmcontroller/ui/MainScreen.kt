@@ -818,6 +818,7 @@ fun SettingsTab(
 ) {
     val volumeLevel by viewModel.ringtoneVolumeLevel.collectAsState()
     val confirmedVolume by viewModel.confirmedVolumeLevel.collectAsState()
+    val clockLightOn by viewModel.clockLightOn.collectAsState()
     val isVolumeTestPlaying by viewModel.isVolumeTestPlaying.collectAsState()
     val lastEspWifiIp by viewModel.lastEspWifiIp.collectAsState()
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
@@ -1019,6 +1020,19 @@ fun SettingsTab(
         // ── Auto-sync ─────────────────────────────────────────────────
         Text("Clockinator " + com.example.alarmcontroller.BuildConfig.VERSION_NAME,
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SettingsSection(title = "Clock light") {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("White light")
+                    Text(if (clockLightOn == null && canSendToDevice) "Waiting for clock state…" else "Full brightness",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = clockLightOn == true,
+                    onCheckedChange = viewModel::setClockLight,
+                    enabled = canSendToDevice && clockLightOn != null)
+            }
+        }
         SettingsSection(title = "Clock screen") {
             OutlinedButton(onClick = viewModel::refreshClockDisplay, enabled = canSendToDevice,
                 modifier = Modifier.fillMaxWidth()) {
