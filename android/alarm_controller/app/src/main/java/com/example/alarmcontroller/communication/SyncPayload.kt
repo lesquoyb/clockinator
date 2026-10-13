@@ -89,6 +89,12 @@ object SyncPayload {
     fun buildSetLight(enabled: Boolean): String =
         JSONObject().put("action", "SET_LIGHT").put("enabled", enabled).toString()
 
+    fun buildSetLightColor(red: Int, green: Int, blue: Int): String {
+        require(red in 0..255 && green in 0..255 && blue in 0..255)
+        return JSONObject().put("action", "SET_LIGHT_COLOR")
+            .put("red", red).put("green", green).put("blue", blue).toString()
+    }
+
     fun buildDisplayRefreshSettings(minutes: Int): String {
         require(minutes in 0..1440)
         return JSONObject().put("action", "SET_DISPLAY_REFRESH").put("minutes", minutes).toString()

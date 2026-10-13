@@ -1,27 +1,48 @@
 #include "globals.h"
 #include "DebouncedButton.h"
+#include <Preferences.h>
 
 // Each switch connects its GPIO to GND. No matrix or diodes are needed.
 constexpr int STOP_BUTTON_PIN = 32;
 constexpr int SNOOZE_BUTTON_PIN = 33;
 constexpr int LIGHT_BUTTON_PIN = 34;
+// Enable only once wired. GPIO34 needs an external pull-up to 3.3 V.
+constexpr bool LIGHT_BUTTON_ENABLED = false;
 constexpr int LIGHT_RED_PIN = 13, LIGHT_GREEN_PIN = 12, LIGHT_BLUE_PIN = 14;
 constexpr bool LIGHT_COMMON_ANODE = false;
 static DebouncedButton stopButton, snoozeButton, lightButton;
 static bool lightOn = false;
+static int lightRed = 255, lightGreen = 255, lightBlue = 255;
 static int physicalAction = 0; // 1 = stop (priority), 2 = cycle snooze
 
 static void writeClockLight() {
-    const int duty = lightOn ? 255 : 0;
-    const int output = LIGHT_COMMON_ANODE ? 255 - duty : duty;
-    analogWrite(LIGHT_RED_PIN, output);
-    analogWrite(LIGHT_GREEN_PIN, output);
-    analogWrite(LIGHT_BLUE_PIN, output);
+    const int red = lightOn ? lightRed : 0;
+    const int green = lightOn ? lightGreen : 0;
+    const int blue = lightOn ? lightBlue : 0;
+    analogWrite(LIGHT_RED_PIN, LIGHT_COMMON_ANODE ? 255 - red : red);
+    analogWrite(LIGHT_GREEN_PIN, LIGHT_COMMON_ANODE ? 255 - green : green);
+    analogWrite(LIGHT_BLUE_PIN, LIGHT_COMMON_ANODE ? 255 - blue : blue);
 }
 
 void notifyLightStatus() {
-    notifyPhone(lightOn ? "{\"action\":\"LIGHT_STATUS\",\"enabled\":true}"
-                        : "{\"action\":\"LIGHT_STATUS\",\"enabled\":false}");
+    char status[128];
+    snprintf(status, sizeof(status), "{\"action\":\"LIGHT_STATUS\",\"enabled\":%s,\"red\":%d,\"green\":%d,\"blue\":%d}",
+             lightOn ? "true" : "false", lightRed, lightGreen, lightBlue);
+    notifyPhone(status);
+}
+
+void setClockLightColor(int red, int green, int blue) {
+    if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) return;
+    if (red != lightRed || green != lightGreen || blue != lightBlue) {
+        lightRed = red; lightGreen = green; lightBlue = blue;
+        Preferences prefs;
+        if (prefs.begin("clock-light", false)) {
+            prefs.putUInt("rgb", (red << 16) | (green << 8) | blue);
+            prefs.end();
+        }
+    }
+    writeClockLight();
+    notifyLightStatus();
 }
 
 void setClockLight(bool enabled) {
@@ -31,9 +52,17 @@ void setClockLight(bool enabled) {
 }
 
 void initPhysicalControls() {
+    Preferences prefs;
+    if (prefs.begin("clock-light", true)) {
+        const unsigned rgb = prefs.getUInt("rgb", 0xFFFFFF);
+        lightRed = (rgb >> 16) & 255;
+        lightGreen = (rgb >> 8) & 255;
+        lightBlue = rgb & 255;
+        prefs.end();
+    }
     pinMode(STOP_BUTTON_PIN, INPUT_PULLUP);
     pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
-    pinMode(LIGHT_BUTTON_PIN, INPUT_PULLUP);
+    if (LIGHT_BUTTON_ENABLED) pinMode(LIGHT_BUTTON_PIN, INPUT);
     pinMode(LIGHT_RED_PIN, OUTPUT);
     pinMode(LIGHT_GREEN_PIN, OUTPUT);
     pinMode(LIGHT_BLUE_PIN, OUTPUT);
@@ -45,7 +74,7 @@ void servicePhysicalControls() {
     const uint32_t now = millis();
     const bool stopPressed = stopButton.update(digitalRead(STOP_BUTTON_PIN) == LOW, now) == 1;
     const bool snoozePressed = snoozeButton.update(digitalRead(SNOOZE_BUTTON_PIN) == LOW, now) == 1;
-    if (lightButton.update(digitalRead(LIGHT_BUTTON_PIN) == LOW, now) == 1) {
+    if (LIGHT_BUTTON_ENABLED && lightButton.update(digitalRead(LIGHT_BUTTON_PIN) == LOW, now) == 1) {
         setClockLight(!lightOn);
     }
     if (stopPressed && (isRinging || hasPendingSnooze())) {

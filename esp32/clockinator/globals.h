@@ -173,6 +173,7 @@ void stopAlarm();
 void snoozeAlarm(int minutes);
 void initPhysicalControls();
 void setClockLight(bool enabled);
+void setClockLightColor(int red, int green, int blue);
 void notifyLightStatus();
 void servicePhysicalControls();
 void applyPhysicalControls();

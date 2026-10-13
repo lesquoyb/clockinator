@@ -87,6 +87,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val confirmedVolumeLevel = _confirmedVolumeLevel.asStateFlow()
     private val _clockLightOn = MutableStateFlow<Boolean?>(null)
     val clockLightOn = _clockLightOn.asStateFlow()
+    private val _clockLightColor = MutableStateFlow<List<Int>?>(null)
+    val clockLightColor = _clockLightColor.asStateFlow()
     private val _isVolumeTestPlaying = MutableStateFlow(false)
     val isVolumeTestPlaying = _isVolumeTestPlaying.asStateFlow()
 
@@ -165,6 +167,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (result.isFailure) _statusAlert.value = "Could not change the clock light."
         }
     }
+    fun setClockLightColor(red: Int, green: Int, blue: Int) {
+        require(red in 0..255 && green in 0..255 && blue in 0..255)
+        if (!isDeviceConnected()) return
+        viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildSetLightColor(red, green, blue))
+            if (result.isFailure) _statusAlert.value = "Could not change the clock light color."
+        }
+    }
     val wifiSyncEnabled = MutableStateFlow(alarmRepository.wifiSyncEnabled())
     fun setWifiSyncEnabled(enabled: Boolean) {
         alarmRepository.setWifiSyncEnabled(enabled)
@@ -225,6 +235,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.distinctUntilChanged().collect { connected ->
                 if (!connected) {
                     _clockLightOn.value = null
+                    _clockLightColor.value = null
                     _confirmedVolumeLevel.value = null
                     _isVolumeTestPlaying.value = false
                 }
@@ -332,6 +343,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when (action) {
             "LIGHT_STATUS" -> {
                 _clockLightOn.value = json.opt("enabled") as? Boolean ?: return
+                val color = listOf("red", "green", "blue").map { json.optInt(it, -1) }
+                if (color.all { it in 0..255 }) _clockLightColor.value = color
             }
             "AUDIO_TEST_STATUS" -> {
                 val status = json.optString("status")

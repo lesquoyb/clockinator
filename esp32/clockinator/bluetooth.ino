@@ -256,6 +256,11 @@ void processIncomingCommand(String raw) {
         }
 
         const char* action = doc["action"] | "";
+        if (strcmp(action, "SET_LIGHT_COLOR") == 0) {
+            if (doc["red"].is<int>() && doc["green"].is<int>() && doc["blue"].is<int>())
+                setClockLightColor(doc["red"].as<int>(), doc["green"].as<int>(), doc["blue"].as<int>());
+            return;
+        }
         if (strcmp(action, "SET_LIGHT") == 0) {
             if (doc["enabled"].is<bool>()) setClockLight(doc["enabled"].as<bool>());
             return;
