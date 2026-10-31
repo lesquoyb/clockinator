@@ -60,7 +60,7 @@ def run(_context: str):
         return mgr.createBox(adsk.core.OrientedBoundingBox3D.create(
             point(0, cy, cz), U, d3, 60, 60, 10))
 
-    for o in [o for o in root.occurrences if o.name.startswith(('Boitier v3', 'LED 5 mm v3', 'Visserie M3 v3', 'tmp-env'))]:
+    for o in [o for o in root.occurrences if o.name.startswith(('Enclosure v3', 'Boitier v3', 'LED 5 mm v3', 'M3 fasteners v3', 'Visserie M3 v3', 'tmp-env'))]:
         o.deleteMe()
 
     # ----- parametres -----
@@ -249,7 +249,7 @@ def run(_context: str):
 
     # ----- couvercle : boutons -----
     mount_y = 11.9907 * scale - 1.3
-    old = next(o for o in root.occurrences if o.name.startswith('Boitier 130'))
+    old = next(o for o in root.occurrences if o.name.startswith('Enclosure 130'))
     old_bodies = {b.name: b for b in old.component.bRepBodies}
     for x, z in joints:      # colonne du capot : appuie sur la platine, la vis traverse capot, platine, puis ecrou de l'equerre
         boolean(lid, cylinder(x, mount_y, z, x, roof_y - .2, z, 4.1), union)
@@ -299,7 +299,7 @@ def run(_context: str):
         boolean(pl, box(*sorted((sx * 54.8, sx * 60.4)), 4.42, 7.62, zr - .02, zr + 3.0), union)
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     comp = occ.component
-    comp.name = 'Boitier v3 - lisse'
+    comp.name = 'Enclosure v3 - smooth'
     base = comp.features.baseFeatures.add()
     base.name = 'Boitier v3'
     base.startEdit()
@@ -309,11 +309,21 @@ def run(_context: str):
     parts += [('Diffuseur blanc - 0.8 mm', diffuser(.8)),
               ('Diffuseur blanc - 0.6 mm (variante)', diffuser(.6, 70)),
               ('Diffuseur blanc - 1.2 mm (variante)', diffuser(1.2, 90))]
+    EN = {'Boitier - coque': 'Shell',
+          'Couvercle - dessus, boutons, LED, retenue ecran': 'Lid',
+          'Touche Lumiere - KS33': 'Key Light - KS33',
+          'Touche Stop - KS33': 'Key Stop - KS33',
+          'Touche Snooze - KS33': 'Key Snooze - KS33',
+          'Platine KS33 - montage par dessous': 'Switch plate - KS33',
+          'Bouchon rainure diffuseur': 'Diffuser slot plug',
+          'Diffuseur blanc - 0.8 mm': 'Diffuser white - 0.8 mm',
+          'Diffuseur blanc - 0.6 mm (variante)': 'Diffuser white - 0.6 mm (variant)',
+          'Diffuseur blanc - 1.2 mm (variante)': 'Diffuser white - 1.2 mm (variant)'}
     for name, shape in parts:
         comp.bRepBodies.add(shape, base)
     base.finishEdit()
     for i, (name, shape) in enumerate(parts):
-        comp.bRepBodies.item(i).name = name
+        comp.bRepBodies.item(i).name = EN.get(name, name)
 
     led_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     led_occ.component.name = 'LED 5 mm v3 - reference'
@@ -325,7 +335,7 @@ def run(_context: str):
 
     # visserie de reference : montre comment les pieces se vissent (une seule face accessible)
     vis = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    vis.component.name = 'Visserie M3 v3 - reference'
+    vis.component.name = 'M3 fasteners v3 - reference'
     vb = vis.component.features.baseFeatures.add()
     vb.startEdit()
     plate_bottom = mount_y - 1.2
@@ -333,7 +343,7 @@ def run(_context: str):
     for x, z in joints:      # capot + platine + equerre de la coque, depuis le dessus
         sh = cylinder(x, roof_y - 1.8, z, x, roof_y, z, 2.75)
         boolean(sh, cylinder(x, -4.8, z, x, roof_y - 1.8, z, 1.5), union)
-        shapes.append(('Vis M3x25 capot+platine', sh))
+        shapes.append(('M3x25 screw lid+plate+shell', sh))
     for _, shape in shapes:
         vis.component.bRepBodies.add(shape, vb)
     vb.finishEdit()
@@ -343,12 +353,12 @@ def run(_context: str):
     # visibilite
     old.isLightBulbOn = False
     for o in root.occurrences:
-        if o.name.startswith(('Boitier v2', 'LED 5 mm v2', 'Visserie M3 - ref')):
+        if o.name.startswith(('Enclosure v2', 'LED 5 mm v2', 'M3 fasteners v2')):
             o.isLightBulbOn = False
     for o in root.occurrences:
-        if o.name.startswith('LED 5 mm - position'):
+        if o.name.startswith('LED 5 mm - mounting'):
             o.isLightBulbOn = False
-        elif o.name.startswith(('Haut-parleur', 'ESP32 - position', 'Ecran 106', 'KS33', 'MAX98357A')):
+        elif o.name.startswith(('Speaker', 'ESP32 - mounting', 'Display 106', 'KS33 Light', 'KS33 Stop', 'KS33 Snooze', 'MAX98357A')):
             o.isLightBulbOn = True
     app.activeViewport.fit()
     out = {b.name: [b.lumps.count, round(b.volume, 3)] for b in comp.bRepBodies}

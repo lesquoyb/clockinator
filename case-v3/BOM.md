@@ -45,14 +45,14 @@ Total: **12 M3 nuts** (4 switch plate + 4 ESP32 + 4 speaker) and **2 M2 nuts**. 
 
 | Qty | Part | File | Filament |
 | ---: | --- | --- | --- |
-| 1 | Shell | `coque.stl` | Opaque |
-| 1 | Lid | `couvercle.stl` | Opaque (the LED shines inside it) |
-| 3 | Keys | `touche-lumiere.stl`, `touche-stop.stl`, `touche-snooze.stl` | Your choice |
-| 1 | Switch plate | `platine-ks33.stl` | Your choice |
-| 1 | Diffuser, 0.8 mm (0.6 and 1.2 mm as variants) | `diffuseur-0.8mm.stl` | Solid white |
-| 1 | Diffuser slot plug | `bouchon-diffuseur.stl` | Opaque, black preferably |
+| 1 | Shell | `shell.stl` | Opaque |
+| 1 | Lid | `lid.stl` | Opaque (the LED shines inside it) |
+| 3 | Keys | `key-light.stl`, `key-stop.stl`, `key-snooze.stl` | Your choice |
+| 1 | Switch plate | `switch-plate.stl` | Your choice |
+| 1 | Diffuser, 0.8 mm (0.6 and 1.2 mm as variants) | `diffuser-0.8mm.stl` | Solid white |
+| 1 | Diffuser slot plug | `diffuser-plug.stl` | Opaque, black preferably |
 
-The v3 STL files are not exported yet: `case-v2/output` still holds the v2 ones.
+STL files are in `case-v3/output`.
 
 ## Tools
 
