@@ -1,0 +1,59 @@
+# Clockinator v3 - Bill of materials (BOM)
+
+What to buy and what to print for the smooth enclosure. No prices. Screw lengths are computed from the model: confirm them against the real parts.
+
+## Electronics
+
+| Qty | Part | Notes |
+| ---: | --- | --- |
+| 1 | ESP32 WROOM 30-pin board, USB-C | Mounting holes assumed M3: measure |
+| 1 | WeAct 3.7" e-paper display (GDEY037T03), 106 x 54 mm | |
+| 1 | MAX98357A I2S amplifier, 18 x 19 mm board | 2 mounting holes, M2 |
+| 1 | Speaker 70 x 30 x 15 mm, 4 M3 holes | Check impedance and power against the amplifier |
+| 3 | Gateron KS-33 low-profile switch | Light, stop, snooze |
+| 1 | 5 mm RGB LED, 4 legs | Diffused preferred; common anode or cathode as set by `COMMON_ANODE` in the firmware |
+| 3 | 330 ohm resistor | One per LED colour (GPIO 13, 12, 14) |
+| 1 | LM393 light sensor module (photoresistor) | Used by `lighting_test`; **no place for it in the enclosure yet** |
+| 1 | ~10 kohm pull-up resistor to 3.3 V | For the light switch on GPIO34, which has no internal pull-up |
+| - | Thin flexible wire, heat-shrink tubing, solder | |
+| 1 | USB-C cable | Powers everything |
+
+## Fasteners
+
+| Qty | Part | Use |
+| ---: | --- | --- |
+| 4 | M3 x 25 screw | Lid + switch plate + shell (one screw per point) |
+| 4 | M3 nut | Under the switch-plate brackets, slid in from the side |
+| 2 | M3 x 25 screw | ESP32, rear posts |
+| 2 | M3 x 30 screw | ESP32, front posts |
+| 4 | M3 nut | ESP32: 2 under the floor (front), 2 in the foot of the posts (rear, side entry) |
+| 4 | M3 x 12 screw | Speaker: enters from outside the rear wall, through the speaker's plastic tab |
+| 4 | M3 nut | Speaker, on the far side of the tab, inside the speaker's own space |
+| 2 | M2 x 8 screw | MAX98357A |
+| 2 | M2 nut | MAX98357A, slid sideways into the posts |
+
+Total: **12 M3 nuts** (4 switch plate + 4 ESP32 + 4 speaker) and **2 M2 nuts**. Keep a few spare screws and nuts. Use cylindrical (ISO 4762) or pan heads; M3 heads at most 5.5 mm across.
+
+## Other
+
+| Qty | Part | Notes |
+| ---: | --- | --- |
+| 4 | Round adhesive feet, 12 mm diameter, 1.2 mm thick at most | Recesses are 12.8 mm wide, under the enclosure |
+| - | Cyanoacrylate or plastic glue | LED and diffuser, if needed |
+
+## Printed parts
+
+| Qty | Part | File | Filament |
+| ---: | --- | --- | --- |
+| 1 | Shell | `coque.stl` | Opaque |
+| 1 | Lid | `couvercle.stl` | Opaque (the LED shines inside it) |
+| 3 | Keys | `touche-lumiere.stl`, `touche-stop.stl`, `touche-snooze.stl` | Your choice |
+| 1 | Switch plate | `platine-ks33.stl` | Your choice |
+| 1 | Diffuser, 0.8 mm (0.6 and 1.2 mm as variants) | `diffuseur-0.8mm.stl` | Solid white |
+| 1 | Diffuser slot plug | `bouchon-diffuseur.stl` | Opaque, black preferably |
+
+The v3 STL files are not exported yet: `case-v2/output` still holds the v2 ones.
+
+## Tools
+
+Soldering iron, screwdriver (Phillips or hex, depending on the head), a long screwdriver for the M3 x 25 lid screws, fine pliers.

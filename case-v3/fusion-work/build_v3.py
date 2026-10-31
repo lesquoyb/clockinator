@@ -1,0 +1,355 @@
+import adsk.core, adsk.fusion, math, json
+
+# Clockinator v3 - boitier lisse (arrondis, pente, arriere rallonge de 12 mm).
+# Deux pieces principales : coque (fond + parois + facade avec logement d'ecran)
+# et couvercle unique (dessus + boutons + visiere LED + retenue de l'ecran).
+# Repere : X largeur, Y haut, Z avant positif. Unites du script : mm.
+
+S3 = math.sqrt(3) / 2
+
+
+def run(_context: str):
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    root = design.rootComponent
+    mgr = adsk.fusion.TemporaryBRepManager.get()
+    U = adsk.core.Vector3D.create(1, 0, 0)
+    V = adsk.core.Vector3D.create(0, S3, -.5)   # haut de la dalle
+    N = adsk.core.Vector3D.create(0, .5, S3)    # normale de la dalle
+    union = adsk.fusion.BooleanTypes.UnionBooleanType
+    cut = adsk.fusion.BooleanTypes.DifferenceBooleanType
+    intersect = adsk.fusion.BooleanTypes.IntersectionBooleanType
+
+    def point(x, y, z):
+        return adsk.core.Point3D.create(x / 10, y / 10, z / 10)
+
+    def box(x0, x1, y0, y1, z0, z1):
+        return mgr.createBox(adsk.core.OrientedBoundingBox3D.create(
+            point((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), U,
+            adsk.core.Vector3D.create(0, 1, 0), (x1 - x0) / 10, (y1 - y0) / 10, (z1 - z0) / 10))
+
+    def frontbox(x0, x1, v0, v1, n0, n1):
+        v = (v0 + v1) / 2
+        n = (n0 + n1) / 2
+        return mgr.createBox(adsk.core.OrientedBoundingBox3D.create(
+            point((x0 + x1) / 2, V.y * v + N.y * n, V.z * v + N.z * n), U, V,
+            (x1 - x0) / 10, (v1 - v0) / 10, (n1 - n0) / 10))
+
+    def boolean(target, tool, operation):
+        assert mgr.booleanOperation(target, tool, operation), 'Boolean failed'
+        return target
+
+    def cylinder(x, y, z, xx, yy, zz, r):
+        return mgr.createCylinderOrCone(point(x, y, z), r / 10, point(xx, yy, zz), r / 10)
+
+    def rounded(x, z, width, depth, y0, y1, r=3):
+        b = box(x - width / 2 + r, x + width / 2 - r, y0, y1, z - depth / 2, z + depth / 2)
+        boolean(b, box(x - width / 2, x + width / 2, y0, y1, z - depth / 2 + r, z + depth / 2 - r), union)
+        for xx in [x - width / 2 + r, x + width / 2 - r]:
+            for zz in [z - depth / 2 + r, z + depth / 2 - r]:
+                boolean(b, cylinder(xx, y0, zz, xx, y1, zz, r), union)
+        return b
+
+    def above_line(z0, y0, z1, y1):
+        """Demi-espace au-dessus de la droite (z0,y0)-(z1,y1) dans le plan YZ."""
+        dz, dy = z1 - z0, y1 - y0
+        length = math.hypot(dz, dy)
+        d3 = adsk.core.Vector3D.create(0, dy / length, dz / length)
+        up = (dz / length, -dy / length)  # (y, z)
+        cy, cz = (y0 + y1) / 2 + up[0] * 50, (z0 + z1) / 2 + up[1] * 50
+        return mgr.createBox(adsk.core.OrientedBoundingBox3D.create(
+            point(0, cy, cz), U, d3, 60, 60, 10))
+
+    for o in [o for o in root.occurrences if o.name.startswith(('Boitier v3', 'LED 5 mm v3', 'Visserie M3 v3', 'tmp-env'))]:
+        o.deleteMe()
+
+    # ----- parametres -----
+    half = 65.0
+    DZ = -12.0                         # arriere rallonge : electronique, platine et touches reculent de 12 mm
+    ZA, ZB = -94.7 + DZ, -60.3 + DZ    # trous de la platine
+    scale = 130 / 154
+    rear = -127.72996 * scale + DZ     # paroi arriere
+    y_bot = -50.44586 * scale          # dessous
+    floor = y_bot + 2.4                # dessus du fond
+    zf = 17.8                          # devant du boitier (menton)
+    roof_y = 22.0                      # dessus plat : touches a fleur
+    split = 5.0                        # plan de coupe coque / couvercle
+    v_split = 24.8                     # coupe inclinee le long de la dalle
+    wall = 2.4
+    roof_t = 2.0                       # epaisseur du dessus du couvercle
+    y_u = 27.0                        # dessous horizontal de la visiere
+    z_vis = -3.37                      # bord avant de la visiere
+    y_top = 36.0                       # sommet de la visiere
+
+    # ----- enveloppe exterieure : profil lateral extrude, puis arrondis -----
+    z0 = -60.0                                   # sommet bas de la rampe
+    z1 = z0 + (y_top - roof_y) / math.tan(math.radians(30))
+    y_chin = -zf / (0.5 / S3)
+    z_u = -.5 * y_u / S3
+    tmp = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    tmp.component.name = 'tmp-env'
+    tc = tmp.component
+    sk = tc.sketches.add(tc.yZConstructionPlane)     # croquis (x, y) -> monde (y, z) = (y, -x)
+    prof = [(rear, y_bot), (zf, y_bot), (zf, y_chin), (z_u, y_u), (z_vis, y_u), (z_vis, y_top),
+            (z1, y_top), (z0, roof_y), (rear, roof_y)]
+    pts = [adsk.core.Point3D.create(-z / 10, y / 10, 0) for z, y in prof]
+    lines = sk.sketchCurves.sketchLines
+    prev = lines.addByTwoPoints(pts[0], pts[1])
+    first = prev
+    for p in pts[2:]:
+        prev = lines.addByTwoPoints(prev.endSketchPoint, p)
+    lines.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint)
+    ei = tc.features.extrudeFeatures.createInput(sk.profiles.item(0), adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    ei.setSymmetricExtent(adsk.core.ValueInput.createByReal(half / 10), False)
+    body = tc.features.extrudeFeatures.add(ei).bodies.item(0)
+    radii = {(rear, y_bot): 6, (zf, y_bot): 10, (zf, y_chin): 5, (z_vis, y_top): 4, (z_vis, y_u): 2.5,
+             (z1, y_top): 40, (z0, roof_y): 40, (rear, roof_y): 5}
+    fi = tc.features.filletFeatures.createInput()
+    for (z, y), r in radii.items():
+        es = adsk.core.ObjectCollection.create()
+        for e in body.edges:
+            if e.geometry.objectType.endswith('Line3D') and abs(e.startVertex.geometry.x - e.endVertex.geometry.x) > .5:
+                g = e.startVertex.geometry
+                if abs(g.y * 10 - y) < .05 and abs(g.z * 10 - z) < .05:
+                    es.add(e)
+        assert es.count == 1, (z, y, es.count)
+        fi.edgeSetInputs.addConstantRadiusEdgeSet(es, adsk.core.ValueInput.createByReal(r / 10), True)
+    tc.features.filletFeatures.add(fi)
+    body = tc.bRepBodies.item(0)
+    sides = adsk.core.ObjectCollection.create()
+    for f in body.faces:
+        if f.geometry.surfaceType == adsk.core.SurfaceTypes.PlaneSurfaceType and abs(f.geometry.normal.x) > .999 and abs(f.geometry.origin.x * 10) > half - .1:
+            for e in f.edges:
+                sides.add(e)
+    fs = tc.features.filletFeatures.createInput()
+    fs.edgeSetInputs.addConstantRadiusEdgeSet(sides, adsk.core.ValueInput.createByReal(.25), True)
+    tc.features.filletFeatures.add(fs)
+    env = mgr.copy(tc.bRepBodies.item(0))
+    outer = mgr.copy(env)                        # enveloppe arrondie, pour borner les plots
+    tmp.deleteMe()
+
+    # ----- volume interieur unique -----
+    cav = box(-half + wall, half - wall, floor, roof_y - roof_t, rear + wall, zf - wall)
+    boolean(cav, frontbox(-300, 300, -300, 300, -300, -6.2), intersect)
+    corner = box(-half - 5, half + 5, y_bot - 1, y_bot + 10, zf - 10, zf + 5)       # le bas avant est arrondi : la cavite suit
+    boolean(corner, cylinder(-half - 6, y_bot + 10, zf - 10, half + 6, y_bot + 10, zf - 10, 10 - wall), cut)
+    boolean(cav, corner, cut)
+    boolean(env, cav, cut)
+
+    # ----- logement de l'ecran : glisse par le haut, retenu par le couvercle -----
+    # Rainures en bas et a gauche seulement (levre avant 1,2 mm + appui arriere) ;
+    # le haut et le cote droit (connecteur) restent degages, le couvercle ferme le haut.
+    boolean(env, frontbox(-53.2, 53.2, -27.2, 27.4, -4.9, -1.2), cut)      # poche 106,4 mm
+    boolean(env, frontbox(-41.4, 42.4, -24.4, v_split, -1.2, 1.5), cut)    # fenetre avant : levres gauche, droite, bas ; le haut est dans le couvercle
+    boolean(env, frontbox(-41.4, 53.2, -24.4, 27.4, -6.7, -4.9), cut)      # fenetre arriere, puce et connecteur
+    boolean(env, frontbox(-53.2, 53.2, v_split, 27.4, -8, -4.9), cut)      # le couvercle ne pousse pas la dalle
+
+    # ----- separation coque / couvercle -----
+    lid_region = box(-100, 100, split, 100, rear - 1, 100)
+    boolean(lid_region, frontbox(-300, 300, v_split, 300, -300, 300), intersect)
+    lid = mgr.copy(env)
+    boolean(lid, lid_region, intersect)
+    shell = env
+    boolean(shell, lid_region, cut)
+
+    # ----- coque : ESP32, haut-parleur, vis, patins -----
+    esp_lift = 11.0                     # carte ESP32 surelevee (passage des fils dessous)
+    esp_x, esp_y, esp_z = -36, -27.5 + esp_lift, rear + 27.8
+    for nx in [-11.6, 11.6]:
+        for ny in [-23.5, 23.5]:
+            x, z = esp_x - nx, esp_z + ny
+            boss = cylinder(x, floor - .2, z, x, esp_y - 1.65, z, 3.2)
+            boolean(boss, mgr.copy(outer), intersect)
+            boolean(shell, boss, union)
+            if z < rear + 12:      # plots arriere : l'arrondi du dessous reste intact, l'ecrou entre par le cote avant
+                collar = cylinder(x, floor - .05, z, x, floor + 5.5, z, 4.2)
+                boolean(collar, mgr.copy(outer), intersect)
+                boolean(shell, collar, union)
+                boolean(shell, cylinder(x, floor + .2, z, x, esp_y, z, 1.7), cut)
+                boolean(shell, box(x - 2.9, x + 2.9, floor + .6, floor + 3.2, z, z + 8), cut)
+                continue
+            boolean(shell, cylinder(x, y_bot - 1, z, x, esp_y, z, 1.7), cut)
+            boolean(shell, box(x - 2.9, x + 2.9, y_bot - 1, y_bot + 2.0, z - 2.9, z + 2.9), cut)
+    # amplificateur MAX98357A : deux plots M2 a la hauteur de l'ESP32, de l'autre cote ; broches vers l'ESP32,
+    # rangee de vis le long de la paroi (bornier cote paroi). L'ecrou M2 glisse de cote dans le plot.
+    amp_top = esp_y - 1.65
+    for z in (-84.5, -71.5):
+        x = 54.2
+        post = cylinder(x, floor - .2, z, x, amp_top, z, 3.6)
+        boolean(post, mgr.copy(outer), intersect)
+        boolean(shell, post, union)
+        boolean(shell, cylinder(x, amp_top - 9, z, x, amp_top + .5, z, 1.2), cut)
+        boolean(shell, box(x - 4.5, x + 2.1, amp_top - 4.2, amp_top - 2.4, z - 2.1, z + 2.1), cut)   # ecrou M2 glisse de cote dans le plot, dessus intact
+    boolean(shell, box(esp_x - 4.8, esp_x + 4.8, -28.94 + esp_lift, -24.04 + esp_lift, rear - 2, rear + 5), cut)   # USB-C
+    boolean(shell, box(-50.6, -21.4, -29.4 + esp_lift, -27.1 + esp_lift, rear + 1.5, rear + 3.4), cut)            # fin de carte
+    spk_up = 4.0                       # haut-parleur remonte : trous hors de l'arrondi du bas
+    spk_dx = 0
+    for x in [-13.5 + spk_dx, 51.5 + spk_dx]:
+        for y in [-36.5 + spk_up, -11.5 + spk_up]:
+            boss = cylinder(x, y, rear + 2.2, x, y, rear + 5.4, 3.2)
+            boolean(shell, boss, union)
+            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 6, 1.7), cut)
+            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 2.0, 3.1), cut)      # lamage de tete : la vis entre par l'exterieur, dans le filetage du haut-parleur
+    for x in range(-7 + spk_dx, 47 + spk_dx, 5):
+        for y in [-31 + spk_up, -26 + spk_up, -21 + spk_up, -16 + spk_up]:
+            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 3, 1.25), cut)
+    screws = []                        # plus de vis de bord : une seule vis relie capot, platine et coque (voir `joints`)
+    joints = [(sx * 53.0, z) for sx in (-1, 1) for z in (ZA, ZB)]
+    for x, z in screws:      # plots des vis du couvercle : bloc contre la paroi, fusionne avec les equerres de la platine
+        sx = 1 if x > 0 else -1
+        boolean(shell, cylinder(x, floor - .2, z, x, split, z, 4.0), union)
+        xa, xb = sorted((x - sx * 3.2, sx * 63.0))
+        boolean(shell, box(xa, xb, floor - .2, split, z - 4.0, z + 4.0), union)
+        if z > -70:
+            boolean(shell, box(xa, xb, -4, split, -69.5, z), union)     # relie le plot avant a l'equerre de la platine
+    # equerres de la platine : barre + plateforme percee, issues des parois ; ecrou depose par le dessus
+    pads = []
+    for sx in (-1, 1):
+        for z in (ZA, ZB):
+            x0, x1 = sorted((sx * 48.5, sx * 63.0))
+            blk = box(x0, x1, -4, 4.42, z - 3.7, z + 3.7)
+            boolean(shell, blk, union)
+            xs = sorted((sx * 53 + sx * 2.9, sx * 53 - sx * 9))
+            boolean(shell, box(xs[0], xs[1], -3.2, -0.8, z - 2.9, z + 2.9), cut)      # ecrou sous l'equerre, entre de cote
+            boolean(shell, cylinder(sx * 53, -6, z, sx * 53, 4.6, z, 1.7), cut)
+            pads.append((x0, x1, z))
+    for x, z in screws:      # vis du couvercle : ecrou depose par le dessus, couvercle retire
+        boolean(shell, cylinder(x, -2, z, x, split + 1, z, 1.7), cut)
+        boolean(shell, box(x - 2.85, x + 2.85, 1.4, split + .3, z - 2.85, z + 2.85), cut)
+    # patins : 4 logements dessous pour des patins adhesifs de 12 mm
+    for x in (-50, 50):
+        for z in (-104, -6):      # hors des arrondis avant et arriere
+            boolean(shell, cylinder(x, y_bot - 1, z, x, y_bot + 1.2, z, 6.4), cut)
+
+    # ----- couvercle : vis, jupe de centrage -----
+    for x, z in screws:
+        boolean(lid, cylinder(x, split, z, x, roof_y - .2, z, 4.1), union)
+        boolean(lid, cylinder(x, split - 1, z, x, y_top + 1, z, 1.7), cut)
+        boolean(lid, cylinder(x, roof_y - 1.8, z, x, y_top + 1, z, 3.1), cut)
+    skirt = box(-62.6, -60.8, split - 2, split + .6, rear + 2.4, -46)
+    boolean(skirt, box(60.8, 62.6, split - 2, split + .6, rear + 2.4, -46), union)
+    boolean(skirt, box(-62.6, 62.6, split - 2, split + .6, rear + 2.4, rear + 4.2), union)
+    for x, z in screws:
+        boolean(skirt, cylinder(x, split - 3, z, x, split + 1, z, 4), cut)
+    boolean(skirt, box(-63, 63, 1, 5.7, -98.6 + DZ, -56.4 + DZ), cut)               # la jupe laisse la place aux equerres de la platine
+    boolean(lid, skirt, union)
+
+    # ----- couvercle : chambre LED, visiere, diffuseur -----
+    led_y = 29.5                      # LED abaissee (etait 31)
+    bay = box(-22, 22, 19, y_top - 2.0, -52, -30.4)                          # baie ouverte sous le couvercle, paroi arriere en pente
+    boolean(bay, above_line(-50.5, 19, -33, y_top - 2.0), cut)
+    boolean(lid, bay, cut)
+    boolean(lid, box(-26, 26, 28.2, 33.8, -28, -7.4), cut)                    # chambre
+    boolean(lid, box(-26, 26, 26.6, 28.3, -30.0, -18.4), cut)                # la chambre descend sous la LED abaissee
+    boolean(lid, box(-26, 26, 26, 28.3, -15.2, -7.4), cut)                    # fenetre de sortie
+    boolean(lid, box(-27.4, 66, 28.2, 29.7, -16.0, -6.2), cut)                # glissiere du diffuseur, entree par le cote droit
+    boolean(lid, box(-12, 12, 28.2, 31, -18, -16.8), union)                   # ecran contre la vue directe
+    boolean(lid, cylinder(0, led_y, -31.4, 0, led_y, -27.9, 2.6), cut)        # trou LED 5 mm
+    boolean(lid, cylinder(0, led_y, -31.4, 0, led_y, -29.4, 3.1), cut)        # logement de la collerette
+
+    # ----- couvercle : boutons -----
+    mount_y = 11.9907 * scale - 1.3
+    old = next(o for o in root.occurrences if o.name.startswith('Boitier 130'))
+    old_bodies = {b.name: b for b in old.component.bRepBodies}
+    for x, z in joints:      # colonne du capot : appuie sur la platine, la vis traverse capot, platine, puis ecrou de l'equerre
+        boolean(lid, cylinder(x, mount_y, z, x, roof_y - .2, z, 4.1), union)
+    z = -77.5 + DZ
+    for x, width in [(-39, 26), (-5, 30), (35, 40)]:
+        collar = rounded(x, z, width + 3.8, 27.8, 16.5, roof_y + .1, 4.9)
+        boolean(collar, rounded(x, z, width + .6, 24.6, 16, roof_y + 1, 3.3), cut)
+        boolean(lid, collar, union)
+        boolean(lid, rounded(x, z, width + .6, 24.6, 14.8, roof_y + 2, 3.3), cut)
+    for x, z in joints:
+        boolean(lid, cylinder(x, mount_y - 1, z, x, roof_y + 5, z, 1.7), cut)
+        boolean(lid, cylinder(x, roof_y - 1.8, z, x, roof_y + 5, z, 3.1), cut)
+
+    # ----- bouchon opaque de la rainure du diffuseur -----
+    plug = box(27.1, 65.0, 28.35, 29.55, -15.85, -6.35)
+    boolean(plug, box(65.0, 66.8, 27.6, 30.3, -16.6, -5.6), union)
+
+    # ----- diffuseurs a essayer -----
+    def diffuser(t, dz=0):
+        d = box(-26.9, 26.9, 28.3, 28.3 + t, -15.9, -6.7)
+        if dz:
+            m = adsk.core.Matrix3D.create()
+            m.translation = adsk.core.Vector3D.create(0, 0, dz / 10)
+            assert mgr.transform(d, m)
+        return d
+
+    # ----- reference LED 5 mm -----
+    led = cylinder(0, led_y, -30.4, 0, led_y, -21.0, 2.5)
+    boolean(led, cylinder(0, led_y, -30.4, 0, led_y, -29.4, 2.9), union)
+
+    # ----- assemblage dans un nouveau composant -----
+    keep = {}
+    for name in ['Touche Lumiere - KS33', 'Touche Stop - KS33', 'Touche Snooze - KS33', 'Platine KS33 - montage par dessous']:
+        keep[name] = mgr.copy(old_bodies[name])
+        tm = adsk.core.Matrix3D.create()
+        tm.translation = adsk.core.Vector3D.create(0, 0, DZ / 10)
+        assert mgr.transform(keep[name], tm)
+    for x in (-53, 53):      # trou + lamage de tete, vis par le dessus
+        for z in (ZA, ZB):
+            boolean(keep['Platine KS33 - montage par dessous'], cylinder(x, 3, z, x, 10, z, 1.75), cut)
+    pl = keep['Platine KS33 - montage par dessous']      # encoches de fils et demi-ronds de coin supprimes : plus utiles
+    zr = -98.0 + DZ
+    for x0, x1 in [(-42, -36), (-8, -2), (32, 38)]:
+        boolean(pl, box(x0 - .02, x1 + .02, 4.42, 7.62, zr - .02, zr + 3.0), union)
+        boolean(pl, box(x0 - .02, x1 + .02, 4.42, 8.82, zr + 2.9, zr + 5.0), union)
+    for sx in (-1, 1):
+        boolean(pl, box(*sorted((sx * 54.8, sx * 60.4)), 4.42, 7.62, zr - .02, zr + 3.0), union)
+    occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    comp = occ.component
+    comp.name = 'Boitier v3 - lisse'
+    base = comp.features.baseFeatures.add()
+    base.name = 'Boitier v3'
+    base.startEdit()
+    parts = [('Boitier - coque', shell), ('Couvercle - dessus, boutons, LED, retenue ecran', lid)]
+    parts += list(keep.items())
+    parts += [('Bouchon rainure diffuseur', plug)]
+    parts += [('Diffuseur blanc - 0.8 mm', diffuser(.8)),
+              ('Diffuseur blanc - 0.6 mm (variante)', diffuser(.6, 70)),
+              ('Diffuseur blanc - 1.2 mm (variante)', diffuser(1.2, 90))]
+    for name, shape in parts:
+        comp.bRepBodies.add(shape, base)
+    base.finishEdit()
+    for i, (name, shape) in enumerate(parts):
+        comp.bRepBodies.item(i).name = name
+
+    led_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    led_occ.component.name = 'LED 5 mm v3 - reference'
+    lb = led_occ.component.features.baseFeatures.add()
+    lb.startEdit()
+    b = led_occ.component.bRepBodies.add(led, lb)
+    b.name = 'LED 5 mm'
+    lb.finishEdit()
+
+    # visserie de reference : montre comment les pieces se vissent (une seule face accessible)
+    vis = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    vis.component.name = 'Visserie M3 v3 - reference'
+    vb = vis.component.features.baseFeatures.add()
+    vb.startEdit()
+    plate_bottom = mount_y - 1.2
+    shapes = []
+    for x, z in joints:      # capot + platine + equerre de la coque, depuis le dessus
+        sh = cylinder(x, roof_y - 1.8, z, x, roof_y, z, 2.75)
+        boolean(sh, cylinder(x, -4.8, z, x, roof_y - 1.8, z, 1.5), union)
+        shapes.append(('Vis M3x25 capot+platine', sh))
+    for _, shape in shapes:
+        vis.component.bRepBodies.add(shape, vb)
+    vb.finishEdit()
+    for i, (name, _) in enumerate(shapes):
+        vis.component.bRepBodies.item(i).name = name
+
+    # visibilite
+    old.isLightBulbOn = False
+    for o in root.occurrences:
+        if o.name.startswith(('Boitier v2', 'LED 5 mm v2', 'Visserie M3 - ref')):
+            o.isLightBulbOn = False
+    for o in root.occurrences:
+        if o.name.startswith('LED 5 mm - position'):
+            o.isLightBulbOn = False
+        elif o.name.startswith(('Haut-parleur', 'ESP32 - position', 'Ecran 106', 'KS33', 'MAX98357A')):
+            o.isLightBulbOn = True
+    app.activeViewport.fit()
+    out = {b.name: [b.lumps.count, round(b.volume, 3)] for b in comp.bRepBodies}
+    print(json.dumps(out, ensure_ascii=False))
