@@ -50,7 +50,7 @@ Total: **12 M3 nuts** (4 switch plate + 4 ESP32 + 4 speaker) and **2 M2 nuts**. 
 | 3 | Keys | `key-light.stl`, `key-stop.stl`, `key-snooze.stl` | Your choice |
 | 1 | Switch plate | `switch-plate.stl` | Your choice |
 | 1 | Diffuser, 0.8 mm (0.6 and 1.2 mm as variants) | `diffuser-0.8mm.stl` | Solid white |
-| 1 | Diffuser slot plug | `diffuser-plug.stl` | Opaque, black preferably |
+| 1 | Diffuser slot plug | `diffuser-plug.stl` | Same white as the lid (the slot is deep enough that it does not need to be black) |
 
 STL files are in `case-v3/output`.
 
