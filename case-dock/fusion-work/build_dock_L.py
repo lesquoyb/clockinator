@@ -44,6 +44,9 @@ def run(_context: str):
     wall, skin = 2.4, 1.2
     cover_t = 1.8
     rad = 6.0
+    pad_diameter, pad_depth = 8.4, 1.0  # 8 x 2 mm adhesive feet; 1 mm protrudes
+    pad_centers = [(x, z) for x in (-33.0, 33.0) for z in (-14.0, 146.0)]
+    assert 0 < pad_depth < cover_t
 
     # ----- outer envelope: L profile extruded across the width, rounded with real fillets -----
     prof = [(z_rear, 0), (z_front, 0), (z_front, plat_y), (0, plat_y), (0, block_y), (z_rear, block_y)]
@@ -86,6 +89,28 @@ def run(_context: str):
     # ----- cavity: open underneath, 1.2 mm skin above the platform -----
     cav = box(-half + wall, half - wall, -1, plat_y - skin, z_rear + wall, z_front - wall)
     boolean(cav, box(-half + wall, half - wall, -1, block_y - wall, z_rear + wall, -wall), union)
+    # Round the cavity's three long platform-ceiling edges. Without this relief,
+    # the rectangular cavity meets the external R6 fillets at a zero-thickness
+    # line (x=+-42.6, y=10.8 and z=169.6), producing non-manifold STL edges.
+    ct=root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    ct.component.name='tmp-dock-cavity'
+    cb=ct.component.features.baseFeatures.add()
+    cb.startEdit()
+    ct.component.bRepBodies.add(cav,cb)
+    cb.finishEdit()
+    ceiling_edges=adsk.core.ObjectCollection.create()
+    for e in ct.component.bRepBodies.item(0).edges:
+        sp,ep=e.startVertex.geometry,e.endVertex.geometry
+        if not (near(sp.y*10,plat_y-skin) and near(ep.y*10,plat_y-skin)):continue
+        side=near(sp.x,ep.x) and near(abs(sp.x)*10,half-wall) and abs(sp.z-ep.z)>5
+        end=near(sp.z,ep.z) and near(sp.z*10,z_front-wall) and abs(sp.x-ep.x)>5
+        if side or end:ceiling_edges.add(e)
+    assert ceiling_edges.count==3,ceiling_edges.count
+    cfi=ct.component.features.filletFeatures.createInput()
+    cfi.edgeSetInputs.addConstantRadiusEdgeSet(ceiling_edges,adsk.core.ValueInput.createByString('1 mm'),True)
+    ct.component.features.filletFeatures.add(cfi)
+    cav=mgr.copy(ct.component.bRepBodies.item(0))
+    ct.deleteMe()
     boolean(shell, cav, cut)
 
     # ----- cover screws: columns on the side walls, nut slides in from the cavity -----
@@ -133,6 +158,14 @@ def run(_context: str):
     for x, z in screws:
         boolean(cov, cylinder(x, -cover_t - 1, z, x, 1, z, 1.7), cut)
         boolean(cov, cylinder(x, -cover_t - 1, z, x, -cover_t + 1.2, z, 3.1), cut)
+    # Feet go on the large underside (negative Y), alongside the screw heads.
+    # Do not cut the block's end face at Z=-30: that is the dock's side.
+    before_pads = cov.volume
+    for x, z in pad_centers:
+        assert all(math.hypot(x-sx, z-sz) > pad_diameter/2 + 3.1 + .5 for sx, sz in screws)
+        boolean(cov, cylinder(x, -cover_t-.1, z, x, -cover_t+pad_depth, z, pad_diameter/2), cut)
+    removed_mm3 = (before_pads-cov.volume)*1000
+    assert abs(removed_mm3-len(pad_centers)*math.pi*(pad_diameter/2)**2*pad_depth) < .1
     tray = box(-1.1, 0.5, 0, 3.5, pcb_z0 - 1.6, pcb_z1 + 1.6)
     boolean(tray, box(-1.1, pcb_x1, 0, 3.5, pcb_z1 + .5, pcb_z1 + 2.1), union)
     boolean(tray, box(-1.1, pcb_x1, 0, 3.5, pcb_z0 - 2.1, pcb_z0 - .5), union)

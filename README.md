@@ -2,6 +2,8 @@
 
 **A smart alarm clock synced with your phone, so you can leave your phone outside the bedroom.**
 
+> **Work in progress.** Clockinator is still under development. Not every part has been assembled or tested, and the complete hardware setup has not yet been validated. The enclosure and dock images below are CAD renders of prototypes, not photographs of finished, tested builds.
+
 Clockinator combines an Android app, an ESP32-based alarm clock, and NFC tags. The app provides flexible Android-style alarms, including scheduled times, recurrence, snooze, and one-off skips. The clock can ring in the bedroom without the phone being there.
 
 The goal is to make doomscrolling before bed and after waking up less automatic. Leave the phone somewhere you choose, ideally next to its charger. In the morning, getting to it requires getting out of bed. NFC tags provide concrete checkpoints that help anchor those habits.
@@ -61,6 +63,20 @@ Pins defined by the firmware:
 
 Check the power requirements and exact pinout of your modules before wiring. The repository does not prescribe a specific ESP32 board or amplifier model.
 
+### Enclosure and phone dock prototypes
+
+The alarm-clock enclosure has a removable top, recessed controls and a hood that directs the LED light towards the e-paper screen. CAD files, printable parts and assembly notes are in [`case/output`](case/output/LISEZ-MOI.md). Fit and lighting still need to be checked on printed parts.
+
+![Alarm-clock enclosure, closed](case/output/apercu-ferme.png)
+
+![Alarm-clock enclosure, open for access to the electronics](case/output/apercu-ouvert.png)
+
+The horizontal L-shaped dock combines a phone platform with space for a Qi driver and an NFC tag. These black renders show the dock without a phone; the underside has four recessed seats for adhesive rubber feet. The [dock guide](case-dock/README.md) covers the latest scripts, STL files and measurements that still need checking.
+
+![Black L-shaped phone dock without a phone, front view](assets/renders/dock-L-black-front.png)
+
+![Black L-shaped phone dock without a phone, rear and USB-side view](assets/renders/dock-L-black-rear.png)
+
 ## Build and run the Android app
 
 Requirements: Android Studio with Android SDK 35 and JDK 21 for the Gradle daemon (configured in `gradle/gradle-daemon-jvm.properties`). The app compiles to Java/Kotlin 17, targets Android 15 (API 35), and supports Android 8.0 (API 26) and later.
@@ -109,6 +125,9 @@ Ringtone files uploaded to the clock must be PCM WAV, mono or stereo, 8- or 16-b
 ```text
 android/alarm_controller/   Android app (Kotlin / Jetpack Compose)
 esp32/clockinator/          ESP32 Arduino firmware
+case/                      Alarm-clock enclosure, CAD scripts and printable parts
+case-dock/                 Phone-dock prototypes, CAD scripts and printable parts
+assets/renders/            Dock renders used in this README
 ```
 
 The Android app owns recurrence calculations and local routine state. The ESP32 receives configuration over BLE or local Wi-Fi, displays the current time and next event on e-paper, and handles audio playback in the bedroom.

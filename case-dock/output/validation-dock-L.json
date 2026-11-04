@@ -1,0 +1,46 @@
+{
+  "document": "phone dock - L",
+  "pad_pockets": {
+    "body": "Bottom cover",
+    "diameter_mm": 8.4,
+    "depth_mm": 1,
+    "foot_height_mm": 2,
+    "protrusion_mm": 1,
+    "remaining_cover_mm": 0.8,
+    "centers_xz_mm": [
+      [
+        -33.0,
+        -14.0
+      ],
+      [
+        -33.0,
+        146.0
+      ],
+      [
+        33.0,
+        -14.0
+      ],
+      [
+        33.0,
+        146.0
+      ]
+    ]
+  },
+  "parts": [
+    {
+      "name": "Dock body",
+      "volume_cm3": 47.44080594684279,
+      "solid": true,
+      "lumps": 1
+    },
+    {
+      "name": "Bottom cover",
+      "volume_cm3": 32.763366217460174,
+      "solid": true,
+      "lumps": 1
+    }
+  ],
+  "interior_transition_radius_mm": 1,
+  "generator_reproduces_live_parts": true,
+  "generator_volume_tolerance_cm3": 1e-07
+}
