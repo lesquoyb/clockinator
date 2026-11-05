@@ -25,7 +25,7 @@ Use four adhesive feet, **8 mm diameter and 2 mm high**. The seats are **8.4 mm 
 
 Pocket centres in model coordinates are X = ±33 mm, Z = −14 and 146 mm; their axes run along Y. They clear all six screw recesses. The 1.8 mm cover retains 0.8 mm of material at each pocket. The corrected generator was rebuilt separately and reproduced both live Fusion parts; the geometry checks do not replace a print and physical assembly test.
 
-The platform cavity also has 1 mm internal transition fillets along its three upper edges. These remove the zero-thickness lines where the original rectangular cavity met the outside rounding. The exterior dimensions are unchanged, and both current STL meshes pass the closed-mesh check.
+The electronics cavity is clipped to a 1.2 mm inset of the rounded exterior. This keeps the cavity from breaking through the rounded corners. The STL meshes pass the closed-mesh check.
 
 ## Earlier inclined prototype
 
@@ -65,6 +65,7 @@ No need to desolder it. The PCB sits in a tray on the floor and the capacitor st
 - The phone lies flat on a 12 mm platform (172 mm long, 90 mm wide); its bottom edge touches the upright block (30 mm high) that holds the Qi driver PCB and the tall capacitor.
 - The coil (reference at z = 85 mm) and NFC tag (z = 150 mm) are taped under the 1.2 mm top skin; move them to suit your phone.
 - Everything is loaded from below. The bottom cover carries the PCB tray, so the PCB is mounted on the cover and slid in with it. The micro-USB port faces the right side wall: 2.4 mm wall, plug body stays outside.
+- The bare Qi PCB measures **41 × 20 mm**. The tray has **21 mm of clear width** between its guides, and the tray and micro-USB opening were shifted together by 3 mm to clear the existing screw columns. At the end opposite micro-USB, a 3 mm return on the inner guide and a 5 mm return on the outer guide leave a **13 mm opening for the soldered wires**. The insertion was checked in CAD; physical fit remains to be tested.
 - 6 x M3 x 6 screws and 6 M3 nuts (nuts slide in from the cavity). Check the orientation and supports in the slicer: the raised electronics block and the phone platform are not coplanar. No print orientation has been physically validated yet.
 - Four 8 x 2 mm adhesive feet fit into 8.4 x 1 mm pockets on the underside cover, alongside the screws. These leave the screws accessible.
 - Interference check against phone, coil, tag, PCB and capacitor: none. No test print.

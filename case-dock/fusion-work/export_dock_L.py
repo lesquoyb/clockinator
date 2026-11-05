@@ -32,7 +32,21 @@ def run(_context: str):
     assert exp.execute(exp.createFusionArchiveExportOptions(os.path.join(directory,'dock-L-assembly.f3d')))
     assert exp.execute(exp.createSTEPExportOptions(os.path.join(directory,'dock-L-parts.step'),component))
     report={'document':app.activeDocument.name,'pad_pockets':{'body':'Bottom cover','diameter_mm':8.4,'depth_mm':1,'foot_height_mm':2,'protrusion_mm':1,'remaining_cover_mm':.8,'centers_xz_mm':sorted(pockets)},'parts':[{'name':b.name,'volume_cm3':b.volume,'solid':b.isSolid,'lumps':b.lumps.count} for b in [body,cover]]}
-    report['interior_transition_radius_mm']=1
+    report['fillet_clearance_envelope_mm']=1.2
+    pcb=next(b for o in design.rootComponent.occurrences if o.component.name=='Dock - references'
+             for b in o.component.bRepBodies if b.name.startswith('Qi driver PCB 41x20'))
+    bounds=pcb.boundingBox
+    assert abs((bounds.maxPoint.z-bounds.minPoint.z)*10-20)<1e-6
+    guides=[f.pointOnFace.z*10 for f in cover.faces
+            if f.geometry.surfaceType==adsk.core.SurfaceTypes.PlaneSurfaceType
+            and abs(f.geometry.normal.z)>.99 and f.boundingBox.maxPoint.y>.34]
+    assert all(any(abs(z-target)<1e-6 for z in guides) for target in (-19.5,1.5)),guides
+    # Confirm the two returns and the open wire passage on the actual cover.
+    outside=adsk.fusion.PointContainment.PointOutsidePointContainment
+    for z,open_passage in [(-15,False),(-14,True),(-7,True),(-2,True),(-1,False)]:
+        point=adsk.core.Point3D.create(-.03,.15,z/10)
+        assert (cover.pointContainment(point)==outside)==open_passage,z
+    report['pcb_tray']={'bare_board_mm':[41,20],'clear_width_mm':21,'side_clearance_mm':.5,'micro_usb_center_z_mm':-9,'inner_stop_mm':3,'outer_stop_mm':5,'wire_opening_mm':13}
     generated=next((doc for doc in app.documents if doc.name=='Phone dock L - script verification'),None)
     if generated:
         gd=adsk.fusion.Design.cast(next(p for p in generated.products if adsk.fusion.Design.cast(p)))

@@ -84,33 +84,25 @@ def run(_context: str):
     body = tc.bRepBodies.item(0)
     shell = mgr.copy(body)
     env = mgr.copy(body)
+    # Derive a clearance envelope from the rounded exterior so that the
+    # rectangular electronics cavity cannot break through any fillet.
+    bottom_faces = adsk.core.ObjectCollection.create()
+    for face in body.faces:
+        bounds = face.boundingBox
+        if abs(bounds.minPoint.y) < 1e-6 and abs(bounds.maxPoint.y) < 1e-6:
+            bottom_faces.add(face)
+    assert bottom_faces.count == 1
+    hollow_input = tc.features.shellFeatures.createInput(bottom_faces, False)
+    hollow_input.insideThickness = adsk.core.ValueInput.createByString('1.2 mm')
+    tc.features.shellFeatures.add(hollow_input)
+    clearance_envelope = mgr.copy(env)
+    boolean(clearance_envelope, tc.bRepBodies.item(0), cut)
     tmp.deleteMe()
 
-    # ----- cavity: open underneath, 1.2 mm skin above the platform -----
+    # Keep the nominal wall and board clearances, trimming only near fillets.
     cav = box(-half + wall, half - wall, -1, plat_y - skin, z_rear + wall, z_front - wall)
     boolean(cav, box(-half + wall, half - wall, -1, block_y - wall, z_rear + wall, -wall), union)
-    # Round the cavity's three long platform-ceiling edges. Without this relief,
-    # the rectangular cavity meets the external R6 fillets at a zero-thickness
-    # line (x=+-42.6, y=10.8 and z=169.6), producing non-manifold STL edges.
-    ct=root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    ct.component.name='tmp-dock-cavity'
-    cb=ct.component.features.baseFeatures.add()
-    cb.startEdit()
-    ct.component.bRepBodies.add(cav,cb)
-    cb.finishEdit()
-    ceiling_edges=adsk.core.ObjectCollection.create()
-    for e in ct.component.bRepBodies.item(0).edges:
-        sp,ep=e.startVertex.geometry,e.endVertex.geometry
-        if not (near(sp.y*10,plat_y-skin) and near(ep.y*10,plat_y-skin)):continue
-        side=near(sp.x,ep.x) and near(abs(sp.x)*10,half-wall) and abs(sp.z-ep.z)>5
-        end=near(sp.z,ep.z) and near(sp.z*10,z_front-wall) and abs(sp.x-ep.x)>5
-        if side or end:ceiling_edges.add(e)
-    assert ceiling_edges.count==3,ceiling_edges.count
-    cfi=ct.component.features.filletFeatures.createInput()
-    cfi.edgeSetInputs.addConstantRadiusEdgeSet(ceiling_edges,adsk.core.ValueInput.createByString('1 mm'),True)
-    ct.component.features.filletFeatures.add(cfi)
-    cav=mgr.copy(ct.component.bRepBodies.item(0))
-    ct.deleteMe()
+    boolean(cav, clearance_envelope, intersect)
     boolean(shell, cav, cut)
 
     # ----- cover screws: columns on the side walls, nut slides in from the cavity -----
@@ -126,8 +118,10 @@ def run(_context: str):
         boolean(shell, box(xs[0], xs[1], 1.5, 4.1, z - 2.9, z + 2.9), cut)
 
     # USB opening in the right wall (port at x = 42.4, plug body stays outside the wall)
-    pcb_x0, pcb_x1, pcb_z0, pcb_z1 = 1.0, 42.0, -19.0, -5.0
-    zc = (pcb_z0 + pcb_z1) / 2
+    pcb_length, pcb_width = 41.0, 20.0  # measured bare board, excluding the connector
+    pcb_x1, zc = 42.0, -9.0             # shift the wider board away from the rear screw columns
+    pcb_x0 = pcb_x1 - pcb_length
+    pcb_z0, pcb_z1 = zc - pcb_width / 2, zc + pcb_width / 2
     boolean(shell, box(41.0, half + 1, 0.65, 5.85, zc - 4.6, zc + 4.6), cut)
 
     # ----- cover with PCB tray (rounded plate, same outline as the body) -----
@@ -166,10 +160,16 @@ def run(_context: str):
         boolean(cov, cylinder(x, -cover_t-.1, z, x, -cover_t+pad_depth, z, pad_diameter/2), cut)
     removed_mm3 = (before_pads-cov.volume)*1000
     assert abs(removed_mm3-len(pad_centers)*math.pi*(pad_diameter/2)**2*pad_depth) < .1
-    tray = box(-1.1, 0.5, 0, 3.5, pcb_z0 - 1.6, pcb_z1 + 1.6)
-    boolean(tray, box(-1.1, pcb_x1, 0, 3.5, pcb_z1 + .5, pcb_z1 + 2.1), union)
-    boolean(tray, box(-1.1, pcb_x1, 0, 3.5, pcb_z0 - 2.1, pcb_z0 - .5), union)
-    boolean(cov, tray, union)
+    clearance, rail = .5, 1.6
+    low, high = pcb_z0 - clearance, pcb_z1 + clearance
+    stop_face = pcb_x0 - clearance
+    left = stop_face - rail
+    # Short returns at the wire end leave 13 mm between the stops.
+    inner_stop, outer_stop = 3.0, 5.0
+    boolean(cov, box(left, pcb_x1, 0, 3.5, high, high + rail), union)
+    boolean(cov, box(left, pcb_x1, 0, 3.5, low - rail, low), union)
+    boolean(cov, box(left, stop_face, 0, 3.5, high - inner_stop, high), union)
+    boolean(cov, box(left, stop_face, 0, 3.5, low, low + outer_stop), union)
 
     # ----- reference parts (assumed sizes) -----
     refs = []
@@ -178,7 +178,22 @@ def run(_context: str):
     pcb = box(pcb_x0, pcb_x1, 0, 2.0, pcb_z0, pcb_z1)
     boolean(pcb, box(pcb_x1 - 6, pcb_x1 + .4, 2.0, 4.6, zc - 3.75, zc + 3.75), union)                # micro-USB
     boolean(pcb, cylinder(14.0, 2.0, zc, 14.0, 18.0, zc, 5.0), union)                                # tall capacitor (assumed 10 x 16 mm)
-    refs.append(('Qi driver PCB 41x14 + capacitor (ref)', pcb))
+    refs.append(('Qi driver PCB 41x20 + capacitor (ref)', pcb))
+
+    # Check the loaded cover as it rises into the shell, including the connector.
+    def assert_clear(a, b, label):
+        overlap = mgr.copy(a)
+        boolean(overlap, b, intersect)
+        assert not overlap.faces.count or abs(overlap.volume) < 1e-6, label
+
+    assert_clear(cov, pcb, 'PCB touches the tray')
+    for drop in (0, 1, 3, 5, 10, 18):
+        shift = adsk.core.Matrix3D.create()
+        shift.translation = adsk.core.Vector3D.create(0, -drop / 10, 0)
+        for part, label in ((cov, 'cover'), (pcb, 'PCB')):
+            moving = mgr.copy(part)
+            assert mgr.transform(moving, shift)
+            assert_clear(moving, shell, f'{label} interferes with shell at {drop} mm below seat')
     refs.append(('Phone 11x75x155 (ref)', box(-37.5, 37.5, plat_y, plat_y + 11.0, 0.0, 155.0)))
 
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())

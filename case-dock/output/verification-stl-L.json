@@ -1,10 +1,10 @@
 [
   {
     "file": "dock-L-body.stl",
-    "triangles": 6400,
+    "triangles": 5368,
     "watertight": true,
-    "volume_mm3": 47395.6324,
-    "cad_volume_mm3": 47440.8059,
+    "volume_mm3": 48109.5819,
+    "cad_volume_mm3": 48146.4182,
     "bounds_mm": [
       [
         -45.0,
@@ -20,10 +20,10 @@
   },
   {
     "file": "dock-L-bottom-cover.stl",
-    "triangles": 2756,
+    "triangles": 2772,
     "watertight": true,
-    "volume_mm3": 32764.7778,
-    "cad_volume_mm3": 32763.3662,
+    "volume_mm3": 32725.5778,
+    "cad_volume_mm3": 32724.1662,
     "bounds_mm": [
       [
         -45.0,

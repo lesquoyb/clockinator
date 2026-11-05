@@ -29,18 +29,30 @@
   "parts": [
     {
       "name": "Dock body",
-      "volume_cm3": 47.44080594684279,
+      "volume_cm3": 48.14641817184351,
       "solid": true,
       "lumps": 1
     },
     {
       "name": "Bottom cover",
-      "volume_cm3": 32.763366217460174,
+      "volume_cm3": 32.724166217460194,
       "solid": true,
       "lumps": 1
     }
   ],
-  "interior_transition_radius_mm": 1,
+  "fillet_clearance_envelope_mm": 1.2,
+  "pcb_tray": {
+    "bare_board_mm": [
+      41,
+      20
+    ],
+    "clear_width_mm": 21,
+    "side_clearance_mm": 0.5,
+    "micro_usb_center_z_mm": -9,
+    "inner_stop_mm": 3,
+    "outer_stop_mm": 5,
+    "wire_opening_mm": 13
+  },
   "generator_reproduces_live_parts": true,
   "generator_volume_tolerance_cm3": 1e-07
 }
