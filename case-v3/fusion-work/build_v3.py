@@ -1,4 +1,4 @@
-import adsk.core, adsk.fusion, math, json
+import adsk.core, adsk.fusion, math, json, importlib.util, os
 
 # Clockinator v3 - boitier lisse (arrondis, pente, arriere rallonge de 12 mm).
 # Deux pieces principales : coque (fond + parois + facade avec logement d'ecran)
@@ -282,21 +282,17 @@ def run(_context: str):
 
     # ----- assemblage dans un nouveau composant -----
     keep = {}
-    for name in ['Touche Lumiere - KS33', 'Touche Stop - KS33', 'Touche Snooze - KS33', 'Platine KS33 - montage par dessous']:
+    for name in ['Touche Lumiere - KS33', 'Touche Stop - KS33', 'Touche Snooze - KS33']:
         keep[name] = mgr.copy(old_bodies[name])
         tm = adsk.core.Matrix3D.create()
         tm.translation = adsk.core.Vector3D.create(0, 0, DZ / 10)
         assert mgr.transform(keep[name], tm)
-    for x in (-53, 53):      # trou + lamage de tete, vis par le dessus
-        for z in (ZA, ZB):
-            boolean(keep['Platine KS33 - montage par dessous'], cylinder(x, 3, z, x, 10, z, 1.75), cut)
-    pl = keep['Platine KS33 - montage par dessous']      # encoches de fils et demi-ronds de coin supprimes : plus utiles
-    zr = -98.0 + DZ
-    for x0, x1 in [(-42, -36), (-8, -2), (32, 38)]:
-        boolean(pl, box(x0 - .02, x1 + .02, 4.42, 7.62, zr - .02, zr + 3.0), union)
-        boolean(pl, box(x0 - .02, x1 + .02, 4.42, 8.82, zr + 2.9, zr + 5.0), union)
-    for sx in (-1, 1):
-        boolean(pl, box(*sorted((sx * 54.8, sx * 60.4)), 4.42, 7.62, zr - .02, zr + 3.0), union)
+    spec = importlib.util.spec_from_file_location(
+        'switch_plate_v3', os.path.join(os.path.dirname(__file__), 'switch_plate.py'))
+    plate_geometry = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(plate_geometry)
+    keep['Platine KS33 - montage par dessous'] = plate_geometry.build_switch_plate(
+        box, cylinder, boolean, union, cut)
     occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     comp = occ.component
     comp.name = 'Enclosure v3 - smooth'

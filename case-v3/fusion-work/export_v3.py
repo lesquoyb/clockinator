@@ -1,6 +1,6 @@
 import adsk.core, adsk.fusion, math, os
 
-OUT = r'C:\Users\baptiste\Documents\GitHub\clockinator\case-v3\output'
+OUT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'output'))
 
 # body name -> (file name, flipped so the face lies on the bed)
 FILES = {

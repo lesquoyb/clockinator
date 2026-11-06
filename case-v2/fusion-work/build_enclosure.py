@@ -253,7 +253,6 @@ def run(_context: str):
     for index,(x,width,label) in enumerate([(-39,26,'Lumiere'),(-5,30,'Stop'),(35,40,'Snooze')]):
         z=-77.5
         boolean(carrier,box(x-7.1,x+7.1,mount_y-5,mount_y+1,z-7.1,z+7.1),cut)
-        boolean(carrier,box(x-3,x+3,mount_y-5,mount_y+1,-99,-93),cut)
         collar=rounded(x,z,width+3.8,27.8,16.5,roof_y+.1,4.9)
         boolean(collar,rounded(x,z,width+.6,24.6,16,roof_y+1,3.3),cut)
         boolean(lid,collar,union)

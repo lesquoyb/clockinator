@@ -1,0 +1,17 @@
+{
+  "valid": true,
+  "solids": 1,
+  "volume_mm3": 7890.433250137392,
+  "rear_rib_and_skin": "continuous",
+  "switch_apertures_mm": [
+    14.2,
+    14.2
+  ],
+  "mounting_holes_diameter_mm": 3.5,
+  "stl_triangles": 2468,
+  "stl_watertight": true,
+  "stl_volume_mm3": 7890.460439826707,
+  "print_min_z_mm": 0.0,
+  "step_solids": 8,
+  "cadquery_version": "2.7.0"
+}
