@@ -30,6 +30,13 @@ The v3 BOM models a 30-pin ESP32 WROOM board with USB-C, a MAX98357A amplifier
 and three Gateron KS-33 switches. Its mounting assumptions must be checked
 against the parts you actually buy.
 
+The current shell places the supplied ESP32 PCB 0.9 mm clear of the rear
+wall. Its supports were moved 1.5 mm inward to remove the former PCB-edge
+relief and keep all four bearing faces level. Use the corrected shell STL or
+STEP; the [export notes](../case-v3/output/README.md) distinguish these from the
+older native Fusion archive. Check that your actual USB cable reaches the
+connector through the opening before completing assembly.
+
 ### Buttons and light
 
 | Function | Firmware wiring |

@@ -1,0 +1,21 @@
+{
+  "valid": true,
+  "solids": 1,
+  "volume_mm3": 107383.50653701602,
+  "esp32_support_top_mm": -18.15,
+  "support_tops": "four complete coplanar annuli",
+  "pcb_rear_clearance_mm": 0.9000000000000008,
+  "usb_opening_mm": [
+    9.6,
+    4.9
+  ],
+  "pcb_relief_present": false,
+  "esp32_reference_solids_checked": 142,
+  "esp32_collisions": [],
+  "cadquery_version": "2.7.0",
+  "stl_triangles": 63218,
+  "stl_watertight": true,
+  "stl_volume_mm3": 107378.50487266012,
+  "print_min_z_mm": -0.0,
+  "step_solids": 8
+}

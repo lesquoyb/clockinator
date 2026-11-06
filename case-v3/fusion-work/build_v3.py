@@ -63,20 +63,20 @@ def run(_context: str):
     for o in [o for o in root.occurrences if o.name.startswith(('Enclosure v3', 'Boitier v3', 'LED 5 mm v3', 'M3 fasteners v3', 'Visserie M3 v3', 'tmp-env'))]:
         o.deleteMe()
 
+    spec = importlib.util.spec_from_file_location(
+        'shell_geometry_v3', os.path.join(os.path.dirname(__file__), 'shell_geometry.py'))
+    shell_geometry = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(shell_geometry)
     # ----- parametres -----
     half = 65.0
-    DZ = -12.0                         # arriere rallonge : electronique, platine et touches reculent de 12 mm
+    DZ = shell_geometry.DZ                         # arriere rallonge : electronique, platine et touches reculent de 12 mm
     ZA, ZB = -94.7 + DZ, -60.3 + DZ    # trous de la platine
-    scale = 130 / 154
-    rear = -127.72996 * scale + DZ     # paroi arriere
-    y_bot = -50.44586 * scale          # dessous
-    floor = y_bot + 2.4                # dessus du fond
+    scale = shell_geometry.SCALE
+    rear = shell_geometry.REAR     # paroi arriere
+    y_bot = shell_geometry.BOTTOM          # dessous
     zf = 17.8                          # devant du boitier (menton)
     roof_y = 22.0                      # dessus plat : touches a fleur
     split = 5.0                        # plan de coupe coque / couvercle
-    v_split = 24.8                     # coupe inclinee le long de la dalle
-    wall = 2.4
-    roof_t = 2.0                       # epaisseur du dessus du couvercle
     y_u = 27.0                        # dessous horizontal de la visiere
     z_vis = -3.37                      # bord avant de la visiere
     y_top = 36.0                       # sommet de la visiere
@@ -122,115 +122,23 @@ def run(_context: str):
             for e in f.edges:
                 sides.add(e)
     fs = tc.features.filletFeatures.createInput()
-    fs.edgeSetInputs.addConstantRadiusEdgeSet(sides, adsk.core.ValueInput.createByReal(.25), True)
+    fs.edgeSetInputs.addConstantRadiusEdgeSet(sides, adsk.core.ValueInput.createByReal(shell_geometry.SIDE_FILLET / 10), True)
     tc.features.filletFeatures.add(fs)
-    env = mgr.copy(tc.bRepBodies.item(0))
-    outer = mgr.copy(env)                        # enveloppe arrondie, pour borner les plots
+    outer = mgr.copy(tc.bRepBodies.item(0))                        # enveloppe arrondie, pour borner les plots
     tmp.deleteMe()
 
-    # ----- volume interieur unique -----
-    cav = box(-half + wall, half - wall, floor, roof_y - roof_t, rear + wall, zf - wall)
-    boolean(cav, frontbox(-300, 300, -300, 300, -300, -6.2), intersect)
-    corner = box(-half - 5, half + 5, y_bot - 1, y_bot + 10, zf - 10, zf + 5)       # le bas avant est arrondi : la cavite suit
-    boolean(corner, cylinder(-half - 6, y_bot + 10, zf - 10, half + 6, y_bot + 10, zf - 10, 10 - wall), cut)
-    boolean(cav, corner, cut)
-    boolean(env, cav, cut)
-
-    # ----- logement de l'ecran : glisse par le haut, retenu par le couvercle -----
-    # Rainures en bas et a gauche seulement (levre avant 1,2 mm + appui arriere) ;
-    # le haut et le cote droit (connecteur) restent degages, le couvercle ferme le haut.
-    boolean(env, frontbox(-53.2, 53.2, -27.2, 27.4, -4.9, -1.2), cut)      # poche 106,4 mm
-    boolean(env, frontbox(-41.4, 42.4, -24.4, v_split, -1.2, 1.5), cut)    # fenetre avant : levres gauche, droite, bas ; le haut est dans le couvercle
-    boolean(env, frontbox(-41.4, 53.2, -24.4, 27.4, -6.7, -4.9), cut)      # fenetre arriere, puce et connecteur
-    boolean(env, frontbox(-53.2, 53.2, v_split, 27.4, -8, -4.9), cut)      # le couvercle ne pousse pas la dalle
-
-    # ----- separation coque / couvercle -----
-    lid_region = box(-100, 100, split, 100, rear - 1, 100)
-    boolean(lid_region, frontbox(-300, 300, v_split, 300, -300, 300), intersect)
-    lid = mgr.copy(env)
-    boolean(lid, lid_region, intersect)
-    shell = env
-    boolean(shell, lid_region, cut)
-
-    # ----- coque : ESP32, haut-parleur, vis, patins -----
-    esp_lift = 11.0                     # carte ESP32 surelevee (passage des fils dessous)
-    esp_x, esp_y, esp_z = -36, -27.5 + esp_lift, rear + 27.8
-    for nx in [-11.6, 11.6]:
-        for ny in [-23.5, 23.5]:
-            x, z = esp_x - nx, esp_z + ny
-            boss = cylinder(x, floor - .2, z, x, esp_y - 1.65, z, 3.2)
-            boolean(boss, mgr.copy(outer), intersect)
-            boolean(shell, boss, union)
-            if z < rear + 12:      # plots arriere : l'arrondi du dessous reste intact, l'ecrou entre par le cote avant
-                collar = cylinder(x, floor - .05, z, x, floor + 5.5, z, 4.2)
-                boolean(collar, mgr.copy(outer), intersect)
-                boolean(shell, collar, union)
-                boolean(shell, cylinder(x, floor + .2, z, x, esp_y, z, 1.7), cut)
-                boolean(shell, box(x - 2.9, x + 2.9, floor + .6, floor + 3.2, z, z + 8), cut)
-                continue
-            boolean(shell, cylinder(x, y_bot - 1, z, x, esp_y, z, 1.7), cut)
-            boolean(shell, box(x - 2.9, x + 2.9, y_bot - 1, y_bot + 2.0, z - 2.9, z + 2.9), cut)
-    # amplificateur MAX98357A : deux plots M2 a la hauteur de l'ESP32, de l'autre cote ; broches vers l'ESP32,
-    # rangee de vis le long de la paroi (bornier cote paroi). L'ecrou M2 glisse de cote dans le plot.
-    amp_top = esp_y - 1.65
-    for z in (-84.5, -71.5):
-        x = 54.2
-        post = cylinder(x, floor - .2, z, x, amp_top, z, 3.6)
-        boolean(post, mgr.copy(outer), intersect)
-        boolean(shell, post, union)
-        boolean(shell, cylinder(x, amp_top - 9, z, x, amp_top + .5, z, 1.2), cut)
-        boolean(shell, box(x - 4.5, x + 2.1, amp_top - 4.2, amp_top - 2.4, z - 2.1, z + 2.1), cut)   # ecrou M2 glisse de cote dans le plot, dessus intact
-    boolean(shell, box(esp_x - 4.8, esp_x + 4.8, -28.94 + esp_lift, -24.04 + esp_lift, rear - 2, rear + 5), cut)   # USB-C
-    boolean(shell, box(-50.6, -21.4, -29.4 + esp_lift, -27.1 + esp_lift, rear + 1.5, rear + 3.4), cut)            # fin de carte
-    spk_up = 4.0                       # haut-parleur remonte : trous hors de l'arrondi du bas
-    spk_dx = 0
-    for x in [-13.5 + spk_dx, 51.5 + spk_dx]:
-        for y in [-36.5 + spk_up, -11.5 + spk_up]:
-            boss = cylinder(x, y, rear + 2.2, x, y, rear + 5.4, 3.2)
-            boolean(shell, boss, union)
-            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 6, 1.7), cut)
-            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 2.0, 3.1), cut)      # lamage de tete : la vis entre par l'exterieur, dans le filetage du haut-parleur
-    for x in range(-7 + spk_dx, 47 + spk_dx, 5):
-        for y in [-31 + spk_up, -26 + spk_up, -21 + spk_up, -16 + spk_up]:
-            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 3, 1.25), cut)
-    screws = []                        # plus de vis de bord : une seule vis relie capot, platine et coque (voir `joints`)
+    # Common direct shell construction; no inherited cutouts or repair solids.
+    from types import SimpleNamespace
+    geometry = SimpleNamespace(box=box, frontbox=frontbox, cylinder=cylinder,
+        boolean=boolean, copy=mgr.copy, union=union, cut=cut, intersect=intersect)
+    shell, lid = shell_geometry.split_enclosure(outer, geometry)
+    shell_geometry.add_shell_features(shell, outer, geometry)
     joints = [(sx * 53.0, z) for sx in (-1, 1) for z in (ZA, ZB)]
-    for x, z in screws:      # plots des vis du couvercle : bloc contre la paroi, fusionne avec les equerres de la platine
-        sx = 1 if x > 0 else -1
-        boolean(shell, cylinder(x, floor - .2, z, x, split, z, 4.0), union)
-        xa, xb = sorted((x - sx * 3.2, sx * 63.0))
-        boolean(shell, box(xa, xb, floor - .2, split, z - 4.0, z + 4.0), union)
-        if z > -70:
-            boolean(shell, box(xa, xb, -4, split, -69.5, z), union)     # relie le plot avant a l'equerre de la platine
-    # equerres de la platine : barre + plateforme percee, issues des parois ; ecrou depose par le dessus
-    pads = []
-    for sx in (-1, 1):
-        for z in (ZA, ZB):
-            x0, x1 = sorted((sx * 48.5, sx * 63.0))
-            blk = box(x0, x1, -4, 4.42, z - 3.7, z + 3.7)
-            boolean(shell, blk, union)
-            xs = sorted((sx * 53 + sx * 2.9, sx * 53 - sx * 9))
-            boolean(shell, box(xs[0], xs[1], -3.2, -0.8, z - 2.9, z + 2.9), cut)      # ecrou sous l'equerre, entre de cote
-            boolean(shell, cylinder(sx * 53, -6, z, sx * 53, 4.6, z, 1.7), cut)
-            pads.append((x0, x1, z))
-    for x, z in screws:      # vis du couvercle : ecrou depose par le dessus, couvercle retire
-        boolean(shell, cylinder(x, -2, z, x, split + 1, z, 1.7), cut)
-        boolean(shell, box(x - 2.85, x + 2.85, 1.4, split + .3, z - 2.85, z + 2.85), cut)
-    # patins : 4 logements dessous pour des patins adhesifs de 12 mm
-    for x in (-50, 50):
-        for z in (-104, -6):      # hors des arrondis avant et arriere
-            boolean(shell, cylinder(x, y_bot - 1, z, x, y_bot + 1.2, z, 6.4), cut)
 
     # ----- couvercle : vis, jupe de centrage -----
-    for x, z in screws:
-        boolean(lid, cylinder(x, split, z, x, roof_y - .2, z, 4.1), union)
-        boolean(lid, cylinder(x, split - 1, z, x, y_top + 1, z, 1.7), cut)
-        boolean(lid, cylinder(x, roof_y - 1.8, z, x, y_top + 1, z, 3.1), cut)
     skirt = box(-62.6, -60.8, split - 2, split + .6, rear + 2.4, -46)
     boolean(skirt, box(60.8, 62.6, split - 2, split + .6, rear + 2.4, -46), union)
     boolean(skirt, box(-62.6, 62.6, split - 2, split + .6, rear + 2.4, rear + 4.2), union)
-    for x, z in screws:
-        boolean(skirt, cylinder(x, split - 3, z, x, split + 1, z, 4), cut)
     boolean(skirt, box(-63, 63, 1, 5.7, -98.6 + DZ, -56.4 + DZ), cut)               # la jupe laisse la place aux equerres de la platine
     boolean(lid, skirt, union)
 
@@ -334,7 +242,6 @@ def run(_context: str):
     vis.component.name = 'M3 fasteners v3 - reference'
     vb = vis.component.features.baseFeatures.add()
     vb.startEdit()
-    plate_bottom = mount_y - 1.2
     shapes = []
     for x, z in joints:      # capot + platine + equerre de la coque, depuis le dessus
         sh = cylinder(x, roof_y - 1.8, z, x, roof_y, z, 2.75)
@@ -345,6 +252,24 @@ def run(_context: str):
     vb.finishEdit()
     for i, (name, _) in enumerate(shapes):
         vis.component.bRepBodies.item(i).name = name
+
+    # Keep the displayed ESP32 reference aligned with the same placement as
+    # its supports. Use absolute bounds so repeated builds do not accumulate
+    # another 1.5 mm translation. Source STEP bounds: X +/-14.25, Y min -27.7,
+    # Z min -9.7 mm; axes are mapped by place_boards.py.
+    for reference in root.occurrences:
+        if reference.name.startswith(('ESP32 - mounting', 'ESP32 - position de montage')):
+            bb = reference.boundingBox
+            target_min = point(shell_geometry.ESP_X - 14.25,
+                               shell_geometry.ESP_Y - 9.7,
+                               shell_geometry.REAR + shell_geometry.ESP_CENTER_FROM_REAR - 27.7)
+            transform = reference.transform2
+            translation = transform.translation
+            translation.x += target_min.x - bb.minPoint.x
+            translation.y += target_min.y - bb.minPoint.y
+            translation.z += target_min.z - bb.minPoint.z
+            transform.translation = translation
+            reference.transform2 = transform
 
     # visibilite
     old.isLightBulbOn = False
