@@ -11,10 +11,14 @@ cd android/alarm_controller
 bash gradlew :app:assembleDebug :app:testDebugUnitTest
 ```
 
-`local.properties` currently contains a Windows-specific SDK path. Developers
-on other machines need a local SDK configuration; cloud onboarding preserves
-the tracked file and investigates an SDK override rather than committing a
-machine-specific replacement.
+`local.properties` currently contains a Windows-specific SDK path. On another
+machine, set `ANDROID_HOME` to the installed SDK and pass
+`-Pandroid.injected.sdk.dir="$ANDROID_HOME"` to Gradle. This override was verified
+in the cloud environment and avoids committing a machine-specific replacement.
+
+The debug APK build and all **18 Android unit tests** passed during cloud
+validation. The packaged application label was checked as **Clockinator**.
+Hardware communication still needs a phone and ESP32 for validation.
 
 ## Firmware host tests
 
