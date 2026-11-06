@@ -45,6 +45,7 @@ import com.example.alarmcontroller.ui.theme.StatusConnected
 import com.example.alarmcontroller.ui.theme.StatusConnecting
 import com.example.alarmcontroller.ui.theme.StatusDisconnected
 import com.example.alarmcontroller.ui.theme.TxBadgeColor
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ fun MainScreen(
     var currentPage by rememberSaveable {
         mutableStateOf(if (viewModel.isSetupRequired) "setup_device" else "home")
     }
+    var settingsOrigin by rememberSaveable { mutableStateOf("home") }
     var editorOrigin by rememberSaveable { mutableStateOf("home") }
     var editingAlarm    by remember { mutableStateOf<AlarmItem?>(null) }
 
@@ -120,6 +122,8 @@ fun MainScreen(
         currentPage = when (currentPage) {
             "setup_alarm" -> "setup_device"
             "alarm_editor" -> editorOrigin
+            "settings" -> settingsOrigin
+            "connection" -> "device"
             else -> "home"
         }
     }
@@ -131,6 +135,7 @@ fun MainScreen(
     // Focus mode onboarding bottom sheet, launched with Activity context via LocalContext
     val context = androidx.compose.ui.platform.LocalContext.current
     val snackbarState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(viewModel) {
         viewModel.nfcToastMessages.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -145,8 +150,21 @@ fun MainScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarState) },
+        bottomBar = {
+            if (currentPage in listOf("home", "routines", "device")) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                    listOf(Triple("home", "Today", Icons.Default.Today),
+                        Triple("routines", "Routines", Icons.Default.Bedtime),
+                        Triple("device", "Clock", Icons.Default.Alarm)).forEach { (page, label, icon) ->
+                        NavigationBarItem(selected = currentPage == page,
+                            onClick = { currentPage = page }, icon = { Icon(icon, contentDescription = null) },
+                            label = { Text(label) })
+                    }
+                }
+            }
+        },
         floatingActionButton = {
-            if (currentPage == "home" && alarms.isNotEmpty()) {
+            if (currentPage == "routines" && alarms.isNotEmpty()) {
                 FloatingActionButton(onClick = { openAlarmEditor() }) {
                     Icon(Icons.Default.Add, contentDescription = "Add routine")
                 }
@@ -158,40 +176,22 @@ fun MainScreen(
                     when (currentPage) {
                         "setup_device" -> Text("Set up your alarm")
                         "setup_alarm" -> Text("Your first routine")
-                        "home" -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("Clockinator", style = MaterialTheme.typography.titleLarge)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Box(Modifier.size(7.dp).clip(CircleShape).background(connectionColor))
-                                    Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth $connectionLabel",
-                                        modifier = Modifier.size(14.dp), tint = connectionColor)
-                                    Text("BT", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Box(Modifier.size(7.dp).clip(CircleShape).background(wifiConnectionColor))
-                                    Icon(Icons.Default.Wifi, contentDescription = "Wi-Fi $wifiConnectionLabel",
-                                        modifier = Modifier.size(14.dp), tint = wifiConnectionColor)
-                                    Text("Wi-Fi", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                if (hasPendingSync) {
-                                    Text("Sync pending", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                                }
-                            }
-                        }
-                        "settings" -> Text("More settings")
-                        "device" -> Text("Alarm clock")
+                        "home" -> Text("Today")
+                        "routines" -> Text("Routines")
+                        "settings" -> Text("Settings")
+                        "device" -> Text("Clock")
+                        "connection" -> Text("Connection & diagnostics")
                         else -> Text(if (editingAlarm == null) "New routine" else "Edit routine")
                     }
                 },
                 navigationIcon = {
-                    if (currentPage != "home" && currentPage != "setup_device") {
+                    if (currentPage !in listOf("home", "routines", "device", "setup_device")) {
                         IconButton(onClick = {
                             currentPage = when (currentPage) {
                                 "setup_alarm" -> "setup_device"
                                 "alarm_editor" -> editorOrigin
+            "settings" -> settingsOrigin
+            "connection" -> "device"
                                 else -> "home"
                             }
                         }) {
@@ -201,14 +201,8 @@ fun MainScreen(
                 },
                 actions = {
                     when (currentPage) {
-                        "home" -> {
-                            IconButton(onClick = { currentPage = "device" }) {
-                                Icon(
-                                    if (isConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
-                                    contentDescription = "Alarm clock connection: $connectionLabel"
-                                )
-                            }
-                            IconButton(onClick = { currentPage = "settings" }) {
+                        "home", "routines", "device" -> {
+                            IconButton(onClick = { settingsOrigin = currentPage; currentPage = "settings" }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Settings")
                             }
                         }
@@ -270,7 +264,19 @@ fun MainScreen(
                 "setup_alarm" -> SetupAlarmScreen(
                     onCreateAlarm = { openAlarmEditor() }
                 )
-                "home" -> {
+                "home" -> TodayScreen(alarms, isConnected || wifiConnectionState is ConnectionState.Connected,
+                    hasPendingSync, { openAlarmEditor() }, { currentPage = "device" },
+                    { openAlarmEditor(it) }, { event ->
+                        viewModel.toggleDismissNext(event.alarm, event.type)
+                        scope.launch {
+                            if (snackbarState.showSnackbar("${event.type.displayLabel()} skipped once", "Undo") == SnackbarResult.ActionPerformed) {
+                                viewModel.alarms.value.find { it.id == event.alarm.id }?.let {
+                                    if (it.isDismissed(event.type)) viewModel.toggleDismissNext(it, event.type)
+                                }
+                            }
+                        }
+                    })
+                "routines" -> {
                     AlarmsTab(
                         alarms = alarms,
                         onAdd = { openAlarmEditor() },
@@ -287,7 +293,10 @@ fun MainScreen(
                     onWriteNfcTag = { payload -> (context as? MainActivity)?.beginNfcTagWrite(payload) },
                     onOpenDevice = { currentPage = "device" }
                 )
-                "device" -> DeviceTab(
+                "device" -> SettingsTab(viewModel, isConnected,
+                    { payload -> (context as? MainActivity)?.beginNfcTagWrite(payload) },
+                    { currentPage = "connection" }, deviceSettings = true)
+                "connection" -> DeviceTab(
                     viewModel = viewModel,
                     hasPermissions = hasPermissions,
                     onRequestPerms = onRequestPermissions,
@@ -747,7 +756,7 @@ fun DeviceTab(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Snooze", style = MaterialTheme.typography.labelMedium)
                         LazyRow(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            items(listOf(5, 10, 30, 60)) { duration ->
+                            items(viewModel.currentSnoozeDurations()) { duration ->
                                 AssistChip(onClick = { viewModel.snoozeCurrentAlarm(duration) },
                                     label = { Text("${duration}m") })
                             }
@@ -814,7 +823,8 @@ fun SettingsTab(
     viewModel: MainViewModel,
     isConnected: Boolean,
     onWriteNfcTag: (String) -> Unit,
-    onOpenDevice: () -> Unit
+    onOpenDevice: () -> Unit,
+    deviceSettings: Boolean = false
 ) {
     val volumeLevel by viewModel.ringtoneVolumeLevel.collectAsState()
     val confirmedVolume by viewModel.confirmedVolumeLevel.collectAsState()
@@ -854,22 +864,22 @@ fun SettingsTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Column(Modifier.padding(top = 16.dp, bottom = 4.dp)) {
-            Text("Settings", style = MaterialTheme.typography.headlineSmall)
-            Text("Personalise alarms and your connected device", style = MaterialTheme.typography.bodySmall,
+            Text(if (deviceSettings) "Clock controls" else "App settings", style = MaterialTheme.typography.headlineSmall)
+            Text(if (deviceSettings) "Sound, light and connection" else "Appearance, tags and permissions", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        SettingsSection(title = "Appearance") {
+        if (!deviceSettings) SettingsSection(title = "Appearance") {
             com.example.alarmcontroller.ui.theme.AppearanceSettings()
         }
 
-        SettingsSection(title = "Alarm clock") {
+        if (deviceSettings) SettingsSection(title = "Alarm clock") {
             Text(if (canSendToDevice) "Connected and syncing alarms" else "Not connected",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = onOpenDevice) { Text("Manage connection") }
         }
 
-        SettingsSection(title = "Clock ringtone volume") {
+        if (deviceSettings) SettingsSection(title = "Clock ringtone volume") {
             ClockVolumeControl(volumeLevel, confirmedVolume, canSendToDevice, viewModel::setRingtoneVolume,
                 uploadedRingtones.sorted(), isVolumeTestPlaying,
                 viewModel::testClockRingtone, viewModel::stopClockRingtoneTest)
@@ -877,7 +887,7 @@ fun SettingsTab(
 
         var wifiSsid by rememberSaveable { mutableStateOf("") }
         var wifiPassword by rememberSaveable { mutableStateOf("") }
-        SettingsSection(title = "Local Wi-Fi") {
+        if (deviceSettings) SettingsSection(title = "Local Wi-Fi") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("Wi-Fi connection and sync", modifier = Modifier.weight(1f))
                 Switch(checked = wifiSync, onCheckedChange = viewModel::setWifiSyncEnabled)
@@ -924,7 +934,7 @@ fun SettingsTab(
         }
 
         // ── NFC Tags ─────────────────────────────────────────────────
-        SettingsSection(title = "NFC Tags") {
+        if (!deviceSettings) SettingsSection(title = "NFC Tags") {
             Text(
                 "Program physical NFC tags to control your alarms hands-free. " +
                 "Place an ODODO tag where you leave your phone outside the bedroom, and an OBOULO tag where you want to \"validate\" that you are awake.",
@@ -955,7 +965,7 @@ fun SettingsTab(
         }
 
         // ── Focus / Lock Mode ─────────────────────────────────────────
-        SettingsSection(title = "Focus Mode") {
+        if (!deviceSettings) SettingsSection(title = "Focus Mode") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Status", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
@@ -983,7 +993,7 @@ fun SettingsTab(
         }
 
         // ── Ringtones ─────────────────────────────────────────────────
-        SettingsSection(title = "Device ringtones") {
+        if (deviceSettings) SettingsSection(title = "Device ringtones") {
             Text("Upload WAV files to the ESP32 filesystem. Assign a file to each alarm when editing it.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
@@ -1028,7 +1038,7 @@ fun SettingsTab(
         // ── Auto-sync ─────────────────────────────────────────────────
         Text("Clockinator " + com.example.alarmcontroller.BuildConfig.VERSION_NAME,
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        SettingsSection(title = "Clock light") {
+        if (deviceSettings) SettingsSection(title = "Clock light") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Light")
@@ -1066,7 +1076,7 @@ fun SettingsTab(
                 Text("Apply RGB")
             }
         }
-        SettingsSection(title = "Clock screen") {
+        if (deviceSettings) SettingsSection(title = "Clock screen") {
             OutlinedButton(onClick = viewModel::refreshClockDisplay, enabled = canSendToDevice,
                 modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
@@ -1093,7 +1103,7 @@ fun SettingsTab(
             }
         }
 
-        SettingsSection(title = "Auto-sync") {
+        if (!deviceSettings) SettingsSection(title = "Auto-sync") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Background checks")
@@ -1211,11 +1221,24 @@ fun PillBadge(text: String, bg: Color, fg: Color) {
 
 @Composable
 fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(12.dp))
-        content()
-        HorizontalDivider(Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    var expanded by rememberSaveable(title) {
+        mutableStateOf(title in listOf("Alarm clock", "Clock ringtone volume", "Clock light"))
+    }
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.fillMaxWidth()) {
+            Surface(onClick = { expanded = !expanded }, color = Color.Transparent) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Collapse $title" else "Expand $title")
+                }
+            }
+            AnimatedVisibility(expanded) {
+                Column(Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+            }
+        }
     }
 }
 
