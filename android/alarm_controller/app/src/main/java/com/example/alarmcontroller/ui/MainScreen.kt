@@ -76,30 +76,13 @@ fun MainScreen(
         is ConnectionState.Error -> "Connection error"
         ConnectionState.Disconnected -> "Disconnected"
     }
-    val connectionColor = when (connectionState) {
-        is ConnectionState.Connected -> StatusConnected
-        is ConnectionState.Connecting -> StatusConnecting
-        is ConnectionState.Error -> StatusDisconnected
-        ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
-    }
-    val wifiConnectionColor = when (wifiConnectionState) {
-        is ConnectionState.Connected -> StatusConnected
-        is ConnectionState.Connecting -> StatusConnecting
-        is ConnectionState.Error -> StatusDisconnected
-        ConnectionState.Disconnected -> MaterialTheme.colorScheme.outline
-    }
-    val wifiConnectionLabel = when (wifiConnectionState) {
-        is ConnectionState.Connected -> "connected"
-        is ConnectionState.Connecting -> "connecting"
-        is ConnectionState.Error -> (wifiConnectionState as ConnectionState.Error).message
-        ConnectionState.Disconnected -> "disconnected"
-    }
     var currentPage by rememberSaveable {
         mutableStateOf(if (viewModel.isSetupRequired) "setup_device" else "home")
     }
     var settingsOrigin by rememberSaveable { mutableStateOf("home") }
     var editorOrigin by rememberSaveable { mutableStateOf("home") }
-    var editingAlarm    by remember { mutableStateOf<AlarmItem?>(null) }
+    var editingAlarmId by rememberSaveable { mutableStateOf<String?>(null) }
+    val editingAlarm = alarms.find { it.id == editingAlarmId }
 
     fun finishSetup() {
         viewModel.completeSetup()
@@ -108,17 +91,17 @@ fun MainScreen(
     }
 
     fun openAlarmEditor(alarm: AlarmItem? = null) {
-        editingAlarm = alarm
+        editingAlarmId = alarm?.id
         editorOrigin = currentPage
         currentPage = "alarm_editor"
     }
 
     fun closeAlarmEditor() {
         currentPage = editorOrigin
-        editingAlarm = null
+        editingAlarmId = null
     }
 
-    BackHandler(enabled = currentPage != "home" && currentPage != "setup_device") {
+    BackHandler(enabled = currentPage !in listOf("home", "setup_device", "alarm_editor")) {
         currentPage = when (currentPage) {
             "setup_alarm" -> "setup_device"
             "alarm_editor" -> editorOrigin
@@ -185,7 +168,7 @@ fun MainScreen(
                     }
                 },
                 navigationIcon = {
-                    if (currentPage !in listOf("home", "routines", "device", "setup_device")) {
+                    if (currentPage !in listOf("home", "routines", "device", "setup_device", "alarm_editor")) {
                         IconButton(onClick = {
                             currentPage = when (currentPage) {
                                 "setup_alarm" -> "setup_device"
@@ -308,6 +291,7 @@ fun MainScreen(
                 )
                 "alarm_editor" -> AlarmDialog(
                     initialAlarm = editingAlarm,
+                    availableRingtones = viewModel.uploadedRingtones.collectAsState().value,
                     onDismiss = { closeAlarmEditor() },
                     onSave = { title, lockPhone, bedtime, wakeup, recurrence, snoozeDurations, ringtoneFile ->
                         viewModel.addOrUpdateAlarm(
@@ -705,12 +689,13 @@ fun DeviceTab(
     val wifiState by viewModel.wifiConnectionState.collectAsState()
     val canSendToDevice = isConnected || wifiState is ConnectionState.Connected
     var textToSend by remember { mutableStateOf("") }
+    var showDiagnostics by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Column(Modifier.padding(top = 16.dp, bottom = 12.dp)) {
             Text("Device", style = MaterialTheme.typography.headlineSmall)
             Text("Connect and manage your Clockinator", style = MaterialTheme.typography.bodySmall,
@@ -767,6 +752,10 @@ fun DeviceTab(
             Spacer(Modifier.height(10.dp))
         }
 
+        TextButton(onClick = { showDiagnostics = !showDiagnostics }) {
+            Text(if (showDiagnostics) "Hide diagnostics" else "Show diagnostics")
+        }
+        if (showDiagnostics) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Activity", style = MaterialTheme.typography.titleSmall)
@@ -774,7 +763,7 @@ fun DeviceTab(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Card(
-            Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp, bottom = 4.dp),
+            Modifier.fillMaxWidth().height(280.dp).padding(top = 8.dp, bottom = 4.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
             shape = RoundedCornerShape(12.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -810,6 +799,7 @@ fun DeviceTab(
                     tint = if (canSendToDevice && textToSend.isNotBlank()) MaterialTheme.colorScheme.onPrimary
                            else MaterialTheme.colorScheme.outline)
             }
+        }
         }
     }
 }
@@ -879,6 +869,17 @@ fun SettingsTab(
             TextButton(onClick = onOpenDevice) { Text("Manage connection") }
         }
 
+        if (deviceSettings) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = viewModel::stopCurrentAlarm, enabled = canSendToDevice,
+                    modifier = Modifier.weight(1f)) { Text("Stop alarm") }
+                Button(onClick = viewModel::pushSyncToDevice, enabled = canSendToDevice,
+                    modifier = Modifier.weight(1f)) { Text("Send routines") }
+            }
+            if (!canSendToDevice) Text("Connect the clock to use its controls. You can still edit routines.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
         if (deviceSettings) SettingsSection(title = "Clock ringtone volume") {
             ClockVolumeControl(volumeLevel, confirmedVolume, canSendToDevice, viewModel::setRingtoneVolume,
                 uploadedRingtones.sorted(), isVolumeTestPlaying,
@@ -944,20 +945,20 @@ fun SettingsTab(
             Spacer(Modifier.height(8.dp))
             NfcTagConfigRow(
                 label       = "ODODO tag",
-                description = "Stops the bedtime alarm & activates focus mode.",
+                description = "Activates Focus; stops a matching ringing event, otherwise toggles the next Focus skip.",
                 payload     = NfcActionHandler.TAG_PAYLOAD_ODODO,
                 onWrite     = { onWriteNfcTag(NfcActionHandler.TAG_PAYLOAD_ODODO) }
             )
             Spacer(Modifier.height(6.dp))
             NfcTagConfigRow(
                 label       = "OBOULO tag",
-                description = "Stops the wake-up alarm & releases focus mode",
+                description = "Releases Focus; stops a ringing Wake-up event, otherwise toggles its next skip.",
                 payload     = NfcActionHandler.TAG_PAYLOAD_OBOULO,
                 onWrite     = { onWriteNfcTag(NfcActionHandler.TAG_PAYLOAD_OBOULO) }
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Default payloads (\"ODODO\" / \"OBOULO\") work out of the box on any blank NFC tag. " +
+                "Tags need an NDEF text record containing ODODO or OBOULO. " +
                 "Tap 'Write' to program a tag, then tap it with your phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
@@ -1050,30 +1051,47 @@ fun SettingsTab(
                     onCheckedChange = viewModel::setClockLight,
                     enabled = canSendToDevice && clockLightOn != null)
             }
-            Text("RGB values: 0–255 per channel. Apply while the light is on to preview.",
-                style = MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(Triple("Red", lightRed, { value: String -> lightRed = value }),
-                    Triple("Green", lightGreen, { value: String -> lightGreen = value }),
-                    Triple("Blue", lightBlue, { value: String -> lightBlue = value })).forEach { (label, value, update) ->
-                    OutlinedTextField(value = value, onValueChange = update,
-                        label = { Text(label) }, modifier = Modifier.weight(1f), singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                        isError = value.toIntOrNull()?.let { it !in 0..255 } ?: true,
-                        enabled = canSendToDevice && clockLightColor != null)
+            val presets = listOf(
+                "Warm" to listOf(255, 190, 130), "White" to listOf(255, 255, 255),
+                "Lavender" to listOf(180, 150, 255), "Blue" to listOf(100, 165, 255))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(presets) { (label, rgb) ->
+                    FilterChip(selected = clockLightColor == rgb,
+                        enabled = canSendToDevice && clockLightColor != null,
+                        onClick = { viewModel.setClockLightColor(rgb[0], rgb[1], rgb[2]) },
+                        leadingIcon = {
+                            Box(Modifier.size(18.dp).clip(CircleShape)
+                                .background(Color(rgb[0], rgb[1], rgb[2])))
+                        }, label = { Text(label) })
                 }
             }
-            val rgb = listOf(lightRed, lightGreen, lightBlue).map { it.toIntOrNull() }
-            OutlinedButton(onClick = {
-                val red = lightRed.toIntOrNull()
-                val green = lightGreen.toIntOrNull()
-                val blue = lightBlue.toIntOrNull()
-                if (red != null && green != null && blue != null)
-                    viewModel.setClockLightColor(red, green, blue)
-            }, enabled = canSendToDevice && clockLightColor != null && rgb.all { it != null && it in 0..255 },
-                modifier = Modifier.fillMaxWidth()) {
-                Text("Apply RGB")
+            var customColor by rememberSaveable { mutableStateOf(false) }
+            TextButton(onClick = { customColor = !customColor }) { Text(if (customColor) "Hide custom colour" else "Custom colour") }
+            if (customColor) {
+                Text("RGB values: 0–255 per channel.", style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(Triple("Red", lightRed, { value: String -> lightRed = value }),
+                        Triple("Green", lightGreen, { value: String -> lightGreen = value }),
+                        Triple("Blue", lightBlue, { value: String -> lightBlue = value })).forEach { (label, value, update) ->
+                        OutlinedTextField(value = value, onValueChange = update,
+                            label = { Text(label) }, modifier = Modifier.weight(1f), singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            isError = value.toIntOrNull()?.let { it !in 0..255 } ?: true,
+                            enabled = canSendToDevice && clockLightColor != null)
+                    }
+                }
+                val rgb = listOf(lightRed, lightGreen, lightBlue).map { it.toIntOrNull() }
+                OutlinedButton(onClick = {
+                    val red = lightRed.toIntOrNull()
+                    val green = lightGreen.toIntOrNull()
+                    val blue = lightBlue.toIntOrNull()
+                    if (red != null && green != null && blue != null)
+                        viewModel.setClockLightColor(red, green, blue)
+                }, enabled = canSendToDevice && clockLightColor != null && rgb.all { it != null && it in 0..255 },
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text("Apply RGB")
+                }
             }
         }
         if (deviceSettings) SettingsSection(title = "Clock screen") {

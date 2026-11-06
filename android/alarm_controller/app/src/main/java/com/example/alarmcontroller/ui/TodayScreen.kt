@@ -54,7 +54,7 @@ fun TodayScreen(alarms: List<AlarmItem>, connected: Boolean, pendingSync: Boolea
                     Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Next routine event", style = MaterialTheme.typography.labelLarge)
                         Text(next.type.displayLabel(), style = MaterialTheme.typography.titleLarge)
-                        Text(timeFormat.format(Date(next.timeMillis)), fontSize = 52.sp)
+                        Text(timeFormat.format(Date(next.timeMillis)), fontSize = 52.sp, lineHeight = 60.sp)
                         Text("${dateFormat.format(Date(next.timeMillis))} · ${next.alarm.title}")
                         val slot = next.alarm.slot(next.type)
                         Text(listOfNotNull("Phone".takeIf { slot.ringOnPhone },
