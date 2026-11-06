@@ -2,132 +2,43 @@
 
 **A smart alarm clock synced with your phone, so you can leave your phone outside the bedroom.**
 
-> **Work in progress.** Clockinator is still under development. Not every part has been assembled or tested, and the complete hardware setup has not yet been validated. The enclosure and dock images below are CAD renders of prototypes, not photographs of finished, tested builds.
+Clockinator helps you put your phone down in the evening and get out of bed in the morning. Set your routines in the Android app, synchronize the clock, and leave your phone at its charging spot. The clock can ring in the bedroom while the phone stays elsewhere.
 
-Clockinator combines an Android app, an ESP32-based alarm clock, and NFC tags. The app provides flexible Android-style alarms, including scheduled times, recurrence, snooze, and one-off skips. The clock can ring in the bedroom without the phone being there.
+A routine has a **Focus** time, an optional **Bedtime** reminder, and a **Wake-up** alarm. Two NFC tags help anchor the routine: one where you leave your phone, another where you start your day. Physical Stop and Snooze buttons remain available on the clock.
 
-The goal is to make doomscrolling before bed and after waking up less automatic. Leave the phone somewhere you choose, ideally next to its charger. In the morning, getting to it requires getting out of bed. NFC tags provide concrete checkpoints that help anchor those habits.
+No account or cloud service is required. The app and clock communicate over Bluetooth, with optional local Wi-Fi. After synchronization, the powered clock follows its schedule without a continuous phone connection. After a clock restart, reconnect the phone to restore time and routines.
 
-## One routine, two or three events
+> **Work in progress.** The enclosure and electronics are prototypes; the complete hardware setup has not yet been validated. Images below are CAD renders, not photographs of an assembled product.
 
-A Clockinator routine can contain these events:
+## The clock
 
-1. **Focus**: starts the evening routine. The phone must ring; the alarm clock can ring too. Place the `ODODO` tag where you want to leave your phone, out of reach and preferably beside its charger.
-2. **Bedtime** *(optional)*: a reminder to go to bed. It can ring on the phone, the alarm clock, or both. At least one output must be selected when it is enabled, so the alarm clock can be the primary output.
-3. **Wake-up**: the morning alarm. The Clockinator must ring; the phone can ring as well. Place the `OBOULO` tag near the first action you want to take, such as going to the kitchen, balcony, or bathroom.
+| Front | Rear |
+| --- | --- |
+| ![Clockinator v3, front-right CAD render](case-v3/renders/front-right.png) | ![Clockinator v3, rear CAD render](case-v3/renders/rear.png) |
 
-Configure events in the app and sync them to the clock. Routines can repeat daily, weekly, or at an interval of days. Each event can be skipped once from the app; the next event in chronological order is offered first.
+The v3 enclosure combines a 3.7-inch e-paper display, a speaker, three keys and a light diffuser. A separate [phone dock](case-dock/README.md) can hold the phone, a Qi charging module and an NFC tag.
 
-### NFC tags
+## Documentation
 
-Tags contain an NDEF Text record with one of these values:
+| I want to… | Guide |
+| --- | --- |
+| Understand routines, NFC, synchronization and offline behaviour | [How it works](docs/how-it-works.md) |
+| Choose parts, wire and assemble the clock | [Build guide](docs/build-guide.md) and [v3 bill of materials](case-v3/BOM.md) |
+| Print the enclosure and controls | [Print settings and orientation](docs/printing.md) |
+| Build and use the Android app | [Android app](docs/android.md) |
+| Compile and flash the ESP32 | [Firmware](docs/firmware.md) |
+| Run the existing software checks | [Development and tests](docs/development.md) |
 
-- `ODODO`: activates Focus Mode on the phone. If the app currently detects a ringing Focus or Bedtime event, scanning the tag stops it and sends the stop command to the clock. When no event is ringing, it toggles the next Focus occurrence's skip state.
-- `OBOULO`: releases Focus Mode. If the app currently detects a ringing Wake-up event, scanning the tag stops it and sends the stop command to the clock. When no event is ringing, it toggles the next Wake-up occurrence's skip state.
+## Source and design files
 
-You can program tags from the app's settings. Tags already written with these values also work. Common rewritable NDEF tags such as NTAG213, NTAG215, and NTAG216 are suitable.
+- [`android/alarm_controller/`](android/alarm_controller/): Android app, Kotlin and Jetpack Compose.
+- [`esp32/clockinator/`](esp32/clockinator/): ESP32 Arduino firmware.
+- [`case-v3/`](case-v3/): current enclosure, CAD scripts, renders and printable parts. See the [export status](case-v3/output/README.md) before using the native Fusion archive.
+- [`case-v2/`](case-v2/): earlier enclosure prototype.
+- [`case-dock/`](case-dock/): phone dock.
 
-> For a tag-triggered stop or skip to be mirrored to the alarm clock, BLE must be available. Currently, tags act on events tracked by the Android app; they do not independently detect an alarm that is ringing only on the ESP32.
+The [UI proposal](docs/design/parcours-et-interface.md) and its [interactive mockup](docs/design/prototype.html) describe a planned interface; they are not screenshots of the current Android app.
 
-## How it works
+## License
 
-- **Android is the source of truth** for routines and recurrence. Phone alarms are scheduled locally with `AlarmManager` and do not depend on an internet connection.
-- **The phone synchronizes routines, time, alarm actions, and ringtone uploads** over Wi-Fi when connected, with BLE available for pairing and fallback.
-- **BLE remains available for pairing and fallback.** During setup, you can optionally enter a local Wi-Fi SSID and password; the app sends them to the ESP32 over BLE.
-- **When configured, the ESP32 joins the Wi-Fi network** and opens a TCP server on port `4210`. Supported bands depend on the chip: classic ESP32 variants are generally 2.4 GHz only, while ESP32-C5 supports 2.4 and 5 GHz. The app connects to its address announced over BLE and falls back to BLE if TCP is unavailable.
-- **The ESP32 calculates and displays the next event**, then plays a built-in melody or a WAV file uploaded from the app. It can notify the phone when an alarm is stopped, snoozed, or skipped so both devices stay in sync.
-- **After the alarm clock restarts**, the phone sends routines again when BLE reconnects. The firmware keeps the routine list in RAM; it is not persisted to flash.
-- **Android Focus Mode** can enable Do Not Disturb and, when the required system permission is available, grayscale. Pausing individual apps is configured through Digital Wellbeing; Android does not let this app pause apps directly without device-management privileges.
-
-The project requires no account, cloud service, or internet access. Wi-Fi communication requires the phone and ESP32 to be on the same local network, with client-to-client traffic allowed. The ESP32 stores Wi-Fi credentials in NVS; the app does not persist them. Wi-Fi provisioning and TCP commands are currently not encrypted or authenticated, so use a trusted local network.
-
-## Hardware
-
-The firmware is intended for a compatible ESP32 board connected to:
-
-- a **3.7-inch GDEY037T03 black-and-white e-paper display**;
-- an I²S audio amplifier and speaker;
-- one or more NFC tags for the phone drop-off and morning checkpoints.
-
-Pins defined by the firmware:
-
-| Function | ESP32 GPIO |
-| --- | ---: |
-| E-paper CS | 5 |
-| E-paper DC | 16 |
-| E-paper RST | 17 |
-| E-paper BUSY | 4 |
-| I²S BCLK | 26 |
-| I²S LRC / WS | 25 |
-| I²S data to amplifier | 27 |
-
-Check the power requirements and exact pinout of your modules before wiring. The repository does not prescribe a specific ESP32 board or amplifier model.
-
-### Enclosure and phone dock prototypes
-
-The alarm-clock enclosure has a removable top, recessed controls and a hood that directs the LED light towards the e-paper screen. CAD files, printable parts and assembly notes are in [`case/output`](case/output/LISEZ-MOI.md). Fit and lighting still need to be checked on printed parts.
-
-![Alarm-clock enclosure, closed](case/output/apercu-ferme.png)
-
-![Alarm-clock enclosure, open for access to the electronics](case/output/apercu-ouvert.png)
-
-The horizontal L-shaped dock combines a phone platform with space for a Qi driver and an NFC tag. These black renders show the dock without a phone; the underside has four recessed seats for adhesive rubber feet. The [dock guide](case-dock/README.md) covers the latest scripts, STL files and measurements that still need checking.
-
-![Black L-shaped phone dock without a phone, front view](assets/renders/dock-L-black-front.png)
-
-![Black L-shaped phone dock without a phone, rear and USB-side view](assets/renders/dock-L-black-rear.png)
-
-## Build and run the Android app
-
-Requirements: Android Studio with Android SDK 35 and JDK 21 for the Gradle daemon (configured in `gradle/gradle-daemon-jvm.properties`). The app compiles to Java/Kotlin 17, targets Android 15 (API 35), and supports Android 8.0 (API 26) and later.
-
-Open `android/alarm_controller` in Android Studio and run the `app` configuration on an Android phone. To build a debug APK from the repository root:
-
-```powershell
-cd android/alarm_controller
-.\gradlew.bat :app:assembleDebug
-```
-
-On macOS or Linux:
-
-```sh
-cd android/alarm_controller
-./gradlew :app:assembleDebug
-```
-
-The APK is written to `android/alarm_controller/app/build/outputs/apk/debug/app-debug.apk`.
-
-On first launch:
-
-1. Grant Bluetooth access and enable Bluetooth if Android asks.
-2. Optionally configure Wi-Fi during pairing or later in **Settings → Local Wi-Fi**. The current network name can be filled in automatically; Android still requires the password to be entered.
-3. Turn on the alarm clock and keep it nearby, then select it in setup.
-4. Create the first routine and choose its repeat days.
-5. To program tags, open **More settings → NFC Tags**, choose `ODODO` or `OBOULO`, then present a compatible tag when the phone says it is ready.
-
-NFC support depends on the phone hardware. Do Not Disturb access must be granted separately in Android settings. Grayscale requires the `WRITE_SECURE_SETTINGS` system permission, which is not granted by default on a standard phone.
-
-## Flash the ESP32 clock
-
-The Arduino firmware is in `esp32/clockinator`. Open `clockinator.ino` with Arduino IDE, install ESP32 board support and the **ArduinoJson 7**, **GxEPD2**, and **Adafruit GFX Library** libraries, select a compatible ESP32 board, and upload the sketch.
-
-For a classic ESP32 with 4 MB flash, select **Partition Scheme → No OTA (2MB APP/2MB SPIFFS)**. With ESP32 core 3.3.12, the firmware is about 1.81 MB and exceeds the default 1.3 MB application partition. Changing partitions may require uploading existing WAV files again.
-
-By default, the clock advertises over BLE as `ESP32-Bapresearch`. Change this name in `esp32/clockinator/bluetooth.ino`. The app uses the BLE service and characteristics defined in the same file. The protocol carries JSON messages for sync, stop, snooze, skip, and optional Wi-Fi setup, as well as audio-file data. The Wi-Fi server uses TCP port `4210` and starts only after the ESP32 joins the configured network.
-
-Ringtone files uploaded to the clock must be PCM WAV, mono or stereo, 8- or 16-bit. The firmware stores them in LittleFS and plays them over I²S. A built-in melody is used when no file is assigned to a routine.
-
-**Settings → Clock ringtone volume** offers five non-mute levels, device confirmation, and a five-second ringtone preview with a stop button. The volume is retained on the phone and ESP32 and shown on e-paper. The MAX98357 GAIN pin keeps its existing wiring; volume is controlled in the digital audio samples.
-
-
-## Repository layout
-
-```text
-android/alarm_controller/   Android app (Kotlin / Jetpack Compose)
-esp32/clockinator/          ESP32 Arduino firmware
-case/                      Alarm-clock enclosure, CAD scripts and printable parts
-case-dock/                 Phone-dock prototypes, CAD scripts and printable parts
-assets/renders/            Dock renders used in this README
-```
-
-The Android app owns recurrence calculations and local routine state. The ESP32 receives configuration over BLE or local Wi-Fi, displays the current time and next event on e-paper, and handles audio playback in the bedroom.
+[MIT](LICENSE).
