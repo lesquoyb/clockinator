@@ -859,6 +859,10 @@ fun SettingsTab(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
+        SettingsSection(title = "Appearance") {
+            com.example.alarmcontroller.ui.theme.AppearanceSettings()
+        }
+
         SettingsSection(title = "Alarm clock") {
             Text(if (canSendToDevice) "Connected and syncing alarms" else "Not connected",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
