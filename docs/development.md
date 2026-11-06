@@ -20,6 +20,13 @@ The debug APK build and all **18 Android unit tests** passed during cloud
 validation. The packaged application label was checked as **Clockinator**.
 Hardware communication still needs a phone and ESP32 for validation.
 
+Real app screenshots have not yet been produced in the cloud environment.
+There is no `/dev/kvm`; the Android 35 emulator was tried in software mode,
+but did not reach `sys.boot_completed=1` during validation. APK installation
+and screen capture requests timed out during that startup. A connected ADB
+device alone is not evidence that the application runs. Use a working emulator
+or Android phone for the remaining UI checks and screenshots.
+
 ## Firmware host tests
 
 These tests use g++ and Arduino stubs; no ESP32 is needed. From the repository root:
