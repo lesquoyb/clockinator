@@ -16,9 +16,9 @@ machine, set `ANDROID_HOME` to the installed SDK and pass
 `-Pandroid.injected.sdk.dir="$ANDROID_HOME"` to Gradle. This override was verified
 in the cloud environment and avoids committing a machine-specific replacement.
 
-The debug APK build and all **18 Android unit tests** passed during cloud
+The debug APK build and all **22 Android unit tests** passed during cloud
 validation. The packaged application label was checked as **Clockinator**.
-Hardware communication still needs a phone and ESP32 for validation.
+The upcoming-event tests cover multiple routines across midnight, skipped occurrences, paused routines, disabled Bedtime, weekly schedules and anchored intervals. Debug lint also passes with zero errors (60 warnings). Hardware communication still needs a phone and ESP32 for validation.
 
 Real app screenshots have not yet been produced in the cloud environment.
 There is no `/dev/kvm`; the Android 35 emulator was tried in software mode,

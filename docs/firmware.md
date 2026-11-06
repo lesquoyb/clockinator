@@ -12,6 +12,6 @@ By default, the clock advertises over BLE as `ESP32-Bapresearch`. Change this na
 
 Ringtone files uploaded to the clock must be PCM WAV, mono or stereo, 8- or 16-bit. The firmware stores them in LittleFS and plays them over I²S. A built-in melody is used when no file is assigned to a routine.
 
-**Settings → Clock ringtone volume** offers five non-mute levels, device confirmation, and a five-second ringtone preview with a stop button. The volume is retained on the phone and ESP32 and shown on e-paper. The MAX98357 GAIN pin keeps its existing wiring; volume is controlled in the digital audio samples.
+**Clock → Clock ringtone volume** offers five non-mute levels, device confirmation, and a five-second ringtone preview with a stop button. The volume is retained on the phone and ESP32 and shown on e-paper. The MAX98357 GAIN pin keeps its existing wiring; volume is controlled in the digital audio samples.
 
 

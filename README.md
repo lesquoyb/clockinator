@@ -37,7 +37,7 @@ The v3 enclosure combines a 3.7-inch e-paper display, a speaker, three keys and 
 - [`case-v2/`](case-v2/): earlier enclosure prototype.
 - [`case-dock/`](case-dock/): phone dock.
 
-The [UI proposal](docs/design/parcours-et-interface.md) and its [interactive mockup](docs/design/prototype.html) describe a planned interface; they are not screenshots of the current Android app.
+The [UI design notes](docs/design/parcours-et-interface.md) and [interactive mockup](docs/design/prototype.html) document the interface direction implemented in the Android app. The HTML mockup uses sample data and is not an app screenshot.
 
 ## License
 

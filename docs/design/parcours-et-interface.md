@@ -1,8 +1,8 @@
 # Clockinator — proposition d’interface
 
-Proposition fondée sur le code Android actuel, le 6 novembre 2026. Les écrans proposés ci-dessous ne sont pas encore implémentés dans l’application. La [maquette interactive](prototype.html) utilise des données d’exemple, sans connexion au réveil.
+Proposition fondée sur le code Android actuel, le 6 novembre 2026. La navigation à trois onglets, la palette, le choix d’apparence, les réglages regroupés et l’éditeur simplifié sont maintenant intégrés dans l’application. Ce document conserve le raisonnement de conception et les objectifs de validation ; il ne constitue pas une preuve de validation visuelle sur appareil. La [maquette interactive](prototype.html) utilise des données d’exemple, sans connexion au réveil.
 
-## Ce qui existe aujourd’hui
+## Point de départ avant intégration
 
 `MainScreen.kt` orchestre six pages : accueil, connexion, réglages, configuration du réveil, première routine et éditeur. L’accueil liste les routines ; les accès au réveil et aux réglages sont des icônes dans la barre supérieure. Il n’y a pas de navigation inférieure.
 
@@ -115,3 +115,11 @@ Le choix **Système** reste la valeur par défaut. La palette de marque proposé
 3. Introduire l’éditeur à frise et les sélecteurs de son/couleur sans changer la logique métier.
 4. Construire Aujourd’hui avec un calcul partagé et testé des prochaines occurrences ; exposer les limites de confirmation du protocole.
 5. Valider sur appareil/émulateur, produire les captures clair/sombre et mettre à jour le README.
+
+## État de l’intégration Android
+
+- Aujourd’hui affiche la prochaine occurrence non passée une fois de chaque événement actif, triée par date entre les routines. Les reports en cours ne sont pas exposés par le modèle actuel ; l’écran indique qu’un report peut sonner avant la prochaine étape de routine.
+- Les réglages distinguent disponibilité de connexion, modifications locales et envoi en attente, sans inventer de confirmation matérielle.
+- L’éditeur conserve les valeurs pendant une recréation d’activité et demande confirmation avant d’abandonner une modification. Les sorties obligatoires restent imposées.
+- La bibliothèque de sons remplace la saisie d’un nom de fichier. Les couleurs prédéfinies sont proposées avant les champs RGB avancés.
+- Validation : compilation debug, 22 tests unitaires et lint debug sans erreur. Les contrôles visuels, TalkBack, grands caractères et interactions matérielles sur un appareil réel restent à effectuer. La maquette HTML est une référence de conception, pas une capture Android.
