@@ -12,7 +12,7 @@ def run(_context: str):
     rendering=design.renderManager.rendering
     directory=r'C:\Users\baptiste\Documents\GitHub\clockinator\assets\renders'
     state.jobs=[]
-    for name,eye in [('dock-L-black-front',(17,24,26)),('dock-L-black-rear',(24,20,-18))]:
+    for name,eye in [('dock-L-white-front',(17,24,26)),('dock-L-white-rear',(24,20,-18))]:
         camera=app.activeViewport.camera
         camera.cameraType=adsk.core.CameraTypes.OrthographicCameraType
         camera.eye=adsk.core.Point3D.create(*eye)

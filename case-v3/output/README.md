@@ -1,63 +1,70 @@
-# Exports v3
+# v3 exports
 
-`switch-plate.stl` et la platine dans `clockinator-v3-parts.step` ont été
-régénérés sans les anciennes encoches de passage de fils. La platine est
-construite directement ; aucune découpe de câble n’est créée puis rebouchée.
-Les trois ouvertures KS33 de 14,2 mm, les quatre perçages de 3,5 mm et les
-nervures sont conservés. Le STL est déjà orienté et posé à Z = 0 pour imprimer.
+`switch-plate.stl` and the switch plate in `clockinator-v3-parts.step` have been
+regenerated without the old wire-routing notches. The plate is built directly;
+no cable cutouts are created and then filled back in. The three 14.2 mm KS33
+openings, four 3.5 mm mounting holes and ribs are retained. The STL is already
+oriented for printing and rests at Z = 0.
 
-La géométrie commune est dans `../fusion-work/switch_plate.py` ; elle est
-utilisée par le build Fusion et par l’export sans interface graphique :
+The shared geometry lives in `../fusion-work/switch_plate.py` and is used by
+both the Fusion build and the headless exporter:
 
 ```sh
 python3 case-v3/fusion-work/export_plate_headless.py
 ```
 
-Cette commande, depuis la racine du dépôt, nécessite CadQuery (validation
-effectuée avec la version indiquée dans `verification-plate.json`). Elle
-remplace uniquement la platine dans le STEP et réexporte son STL, puis vérifie
-les volumes et dimensions des huit solides STEP ainsi que la fermeture du
-maillage. Les autres STL restent inchangés. Les résultats sont enregistrés
-dans `verification-plate.json`.
+Run this command from the repository root. It requires CadQuery (the version
+used for validation is recorded in `verification-plate.json`). It replaces
+only the switch plate in the STEP file and re-exports its STL, then checks the
+volumes and dimensions of all eight STEP solids and verifies that the mesh is
+watertight. The other STL files remain unchanged. Results are recorded in
+`verification-plate.json`.
 
-## Coque et montage ESP32
+## Shell and ESP32 mounting
 
-`shell.stl` et la coque du STEP sont construits directement depuis le profil
-extérieur, sans repartir d'une coque à réparer. La carte et ses quatre
-fixations sont décalées de **1,5 mm vers l'intérieur** par rapport à l'export
-précédent. Cela laisse **0,9 mm entre le bord du PCB fourni et la face intérieure
-de la paroi arrière**. La découpe « fin de carte » a été supprimée : il ne reste
-dans cette zone que l'ouverture USB-C de 9,6 × 4,9 mm. Les quatre appuis ont un
-dessus complet et coplanaire à Y = −18,15 mm dans le repère du modèle.
+`shell.stl` and the STEP shell are built directly from the outer profile,
+without starting from a shell that needs repair. The board and its four mounts
+are shifted **1.5 mm inward** compared with the previous export. This leaves
+**0.9 mm between the edge of the supplied PCB and the inside face of the rear
+wall**. The cutout at the end of the board has been removed: only the
+9.6 × 4.9 mm USB-C opening remains in this area. All four supports have complete,
+coplanar top faces at Y = −18.15 mm in model coordinates.
 
 ```sh
 python3 case-v3/fusion-work/export_shell_headless.py
 ```
 
-La géométrie est partagée avec Fusion dans `shell_geometry.py`. L'adaptateur
-CadQuery reconstruit le profil et ses arrondis en millimètres ; aucun bloc
-ne comble une découpe antérieure. Le générateur Fusion ne conserve plus les
-boucles de visserie désactivées. La position de la référence ESP32 est alignée
-de manière absolue, sans accumuler un déplacement à chaque build.
+The geometry is shared with Fusion through `shell_geometry.py`. The CadQuery
+adapter rebuilds the profile and its rounded edges in millimetres; no blocks
+fill earlier cutouts. The Fusion generator no longer retains the disabled
+fastener loops. The ESP32 reference is aligned to an absolute position, so
+repeated builds do not accumulate an offset.
 
-L'export vérifie les quatre surfaces d'appui et leurs perçages, la continuité
-de la paroi autour du port, l'ouverture USB-C et l'absence d'intersection avec
-les **142 solides du STEP ESP32 fourni**. Le STEP réimporté est vérifié à
-nouveau, puis le maillage STL est contrôlé fermé, manifold et posé à Z = 0.
-Les résultats sont dans `verification-shell.json`. Les autres pièces du STEP
-gardent leurs dimensions et volumes à la tolérance de réexport près ; leurs
-STL ne sont pas régénérés. La comparaison ponctuelle de 30 000 positions avec
-l'ancien export n'a détecté aucune différence hors de la zone ESP32.
+The exporter checks the four support faces and their holes, wall continuity
+around the port, the USB-C opening and clearance from all **142 solids in the
+supplied ESP32 STEP file**. The reimported STEP is checked again, then the STL
+mesh is checked for watertightness, manifold topology and placement at Z = 0.
+Results are recorded in `verification-shell.json`. The other STEP parts retain
+their dimensions and volumes within re-export tolerance; their STL files are
+not regenerated. A comparison at 30,000 sample positions against the previous
+export found no differences outside the ESP32 area.
 
-Il reste à vérifier le montage imprimé et l'accès avec le câble USB réellement
-utilisé ; un contrôle du modèle ne remplace pas cet essai.
+The printed assembly and access with the actual USB cable still need to be
+tested; checking the model does not replace a physical test.
 
-**Archive Fusion à réexporter :** `clockinator-v3-assembly.f3d` est l’ancienne
-archive et contient encore l’ancienne platine et l’ancienne coque. Elle n’a pas
-été modifiée par
-l’export CadQuery. Pour la mettre à jour, ouvrir cette archive dans Fusion,
-exécuter `../fusion-work/build_v3.py` puis `../fusion-work/export_v3.py`.
-Conserver `switch_plate.py` et `shell_geometry.py` à côté de `build_v3.py`. Ne
-pas exporter les pièces
-depuis l’ancienne archive avant d’avoir exécuté le build corrigé. Le STEP et
-le STL sont les exports corrigés à utiliser en attendant.
+## Fusion archive and renders
+
+`clockinator-v3-assembly.f3d` has been rebuilt with the current versions of
+`build_v3.py`, `shell_geometry.py` and `switch_plate.py`. The shell and switch
+plate in the archive match the volumes of the latest exports, as checked in
+`verification-fusion.json`.
+
+To update only the native archive after a build, run
+`../fusion-work/export_native_v3.py` in Fusion. The script checks the shell and
+switch plate before exporting. Keep both geometry modules alongside
+`build_v3.py`.
+
+The five views in `../renders/` come from the rebuilt assembly.
+`../fusion-work/render_v3.py` prepares the presentation copy, then
+`../fusion-work/render_queue.py` starts the local renders in a separate script
+invocation. The diffuser variants are hidden in the presentation.

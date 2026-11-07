@@ -15,19 +15,19 @@ def run(_context: str):
     mgr=adsk.fusion.TemporaryBRepManager.get()
     shapes=[(b.name,mgr.copy(b)) for b in comp.bRepBodies]
     assert len(shapes)==2
-    doc=next((doc for doc in app.documents if doc.name=='Phone dock L - black renders'),None)
+    doc=next((doc for doc in app.documents if doc.name=='Phone dock L - white renders'),None)
     if doc:
         doc.activate()
     else:
         doc=app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
-        doc.name='Phone dock L - black renders'
+        doc.name='Phone dock L - white renders'
     design=adsk.fusion.Design.cast(app.activeProduct)
     root=design.rootComponent
     for feature in list(root.features.baseFeatures):feature.deleteMe()
-    library=next(lib for lib in app.materialLibraries if lib.appearances.itemByName('Plastique - Mat (noir)'))
-    black=design.appearances.itemByName('Dock - black plastic') or design.appearances.addByCopy(library.appearances.itemByName('Plastique - Mat (noir)'),'Dock - black plastic')
-    black.color=adsk.core.Color.create(20,22,25,255)
-    black.roughness=.62
+    library=next(lib for lib in app.materialLibraries if lib.appearances.itemByName('Plastique - Mat (blanc)'))
+    white=design.appearances.itemByName('Dock - white plastic') or design.appearances.addByCopy(library.appearances.itemByName('Plastique - Mat (blanc)'),'Dock - white plastic')
+    white.color=adsk.core.Color.create(245,245,242,255)
+    white.roughness=.62
     rubber=design.appearances.itemByName('Feet - matte rubber') or design.appearances.addByCopy(library.appearances.itemByName('Plastique - Mat (noir)'),'Feet - matte rubber')
     rubber.color=adsk.core.Color.create(8,9,10,255)
     rubber.roughness=.9
@@ -41,7 +41,7 @@ def run(_context: str):
     base.finishEdit()
     for i,b in enumerate(root.bRepBodies):
         b.name=shapes[i][0] if i<2 else 'Rubber foot'
-        b.appearance=black if i<2 else rubber
+        b.appearance=white if i<2 else rubber
     root.isOriginFolderLightBulbOn=False
     rm=design.renderManager
     assert rm.activateRenderWorkspace()

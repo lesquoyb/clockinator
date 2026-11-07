@@ -4,16 +4,16 @@
 
 The current version is the **horizontal L-shaped dock**, Fusion document `phone dock - L`. The earlier inclined prototypes are retained below for reference.
 
-![Black L-shaped dock without a phone, front view](../assets/renders/dock-L-black-front.png)
+![White L-shaped dock without a phone, front view](../assets/renders/dock-L-white-front.png)
 
-![Black L-shaped dock without a phone, rear and USB-side view](../assets/renders/dock-L-black-rear.png)
+![White L-shaped dock without a phone, rear and USB-side view](../assets/renders/dock-L-white-rear.png)
 
 ## Current L version: files and reproduction
 
 - `fusion-work/build_dock_L.py` builds the L dock, including the four corrected foot pockets on the underside cover.
 - `fusion-work/export_dock_L.py` exports the current open L dock, preserving its existing Fusion edits, and checks the pocket positions and depths before export.
 - `fusion-work/verify_dock_exports.py` checks the two exported STL meshes and the Fusion archive.
-- `fusion-work/render_dock_L.py` prepares a matte-black copy on a white background, without the phone or internal reference components. Run `render_queue.py` next to frame the committed geometry and queue the two local Fusion renders; `render_status.py` reports their progress. The working model is not recoloured.
+- `fusion-work/render_dock_L.py` prepares a matte-white copy on a white background, without the phone or internal reference components. Run `render_queue.py` next to frame the committed geometry and queue the two local Fusion renders; `render_status.py` reports their progress.
 
 Latest parts: [body STL](output/dock-L-body.stl), [bottom-cover STL](output/dock-L-bottom-cover.stl), [Fusion assembly](output/dock-L-assembly.f3d), [STEP parts](output/dock-L-parts.step). STL dimensions are in millimetres and retain the original model coordinates: X across the dock, Y upwards, Z along the phone. Orient the parts and inspect support requirements in the slicer before printing.
 

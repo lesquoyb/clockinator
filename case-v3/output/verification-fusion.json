@@ -1,0 +1,56 @@
+{
+  "parts": {
+    "Shell": {
+      "volume_mm3": 107383.50653701874,
+      "matches_current_geometry": true
+    },
+    "Switch plate - KS33": {
+      "volume_mm3": 7890.433250137461,
+      "matches_current_geometry": true
+    }
+  },
+  "native_body_count": 10,
+  "native_parts": [
+    {
+      "name": "Shell",
+      "volume_mm3": 107383.50653701874
+    },
+    {
+      "name": "Lid",
+      "volume_mm3": 95020.59951417887
+    },
+    {
+      "name": "Key Light - KS33",
+      "volume_mm3": 2091.983058271202
+    },
+    {
+      "name": "Key Stop - KS33",
+      "volume_mm3": 2321.952261341509
+    },
+    {
+      "name": "Key Snooze - KS33",
+      "volume_mm3": 2962.908976288591
+    },
+    {
+      "name": "Switch plate - KS33",
+      "volume_mm3": 7890.433250137461
+    },
+    {
+      "name": "Diffuser slot plug",
+      "volume_mm3": 485.5200000000004
+    },
+    {
+      "name": "Diffuser white - 0.8 mm",
+      "volume_mm3": 395.96800000000025
+    },
+    {
+      "name": "Diffuser white - 0.6 mm (variant)",
+      "volume_mm3": 296.9760000000024
+    },
+    {
+      "name": "Diffuser white - 1.2 mm (variant)",
+      "volume_mm3": 593.9520000000005
+    }
+  ],
+  "archive_updated": true
+}
