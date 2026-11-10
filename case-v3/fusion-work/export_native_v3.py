@@ -20,6 +20,9 @@ def run(_context: str):
         volume = body.volume * 1000
         assert abs(volume - expected) < .2, (name, volume, expected)
         checks[name] = {'volume_mm3': volume, 'matches_current_geometry': True, 'volume_tolerance_mm3': .2, 'volume_difference_mm3': volume - expected}
+    diffuser = component.bRepBodies.itemByName('Diffuser white - 0.8 mm').boundingBox
+    diffuser_center = (diffuser.minPoint.x + diffuser.maxPoint.x) * 5
+    assert abs(diffuser_center) < .001, 'Diffuser is not centered on the facade'
     bodies = []
     for body in component.bRepBodies:
         assert body.isSolid and body.lumps.count == 1, body.name
@@ -30,7 +33,7 @@ def run(_context: str):
     assert design.exportManager.execute(
         design.exportManager.createFusionArchiveExportOptions(path))
     result = {'parts': checks, 'native_body_count': len(bodies),
-              'native_parts': bodies, 'archive_updated': True}
+              'native_parts': bodies, 'archive_updated': True, 'diffuser_center_x_mm': diffuser_center}
     with open(os.path.join(directory, 'verification-fusion.json'), 'w', encoding='utf-8') as handle:
         json.dump(result, handle, indent=2)
     print(json.dumps(result))

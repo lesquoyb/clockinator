@@ -26,7 +26,7 @@ What to buy and what to print for the smooth enclosure. No prices. Screw lengths
 | 4 | M3 nut | Under the switch-plate brackets, slid in from the side |
 | 4 | M3 x 30 screw | ESP32, underside-entry posts; confirm length after printing |
 | 4 | M3 nut | ESP32: all 4 inserted from underneath |
-| 4 | M3 x 12 screw | Speaker: enters from outside the rear wall, through the speaker's plastic tab; recheck length with the standoffs removed |
+| 4 | M3 x 8 screw (provisional) | Speaker: enters from outside the rear wall, through the speaker's plastic tab; recheck length with the standoffs removed |
 | 4 | M3 nut | Speaker, on the far side of the tab, inside the speaker's own space |
 | 2 | M2 screw, length to measure | MAX98357A: now passes through the full post to an underside nut; the former 8 mm screw is too short |
 | 2 | M2 nut | MAX98357A, inserted from underneath |

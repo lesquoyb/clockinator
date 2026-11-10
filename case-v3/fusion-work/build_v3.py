@@ -275,6 +275,16 @@ def run(_context: str):
             transform.translation = translation
             reference.transform2 = transform
 
+    # Absolute lateral alignment of the board with the centered visible window.
+    for reference in root.occurrences:
+        if reference.name.startswith('Display 106'):
+            bb = reference.boundingBox
+            transform = reference.transform2
+            shift = transform.translation
+            shift.x += shell_geometry.DISPLAY_X / 10 - (bb.minPoint.x + bb.maxPoint.x) / 2
+            transform.translation = shift
+            reference.transform2 = transform
+
     # visibilite
     old.isLightBulbOn = False
     for o in root.occurrences:

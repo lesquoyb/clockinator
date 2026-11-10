@@ -10,6 +10,7 @@ REAR = -127.72996 * SCALE + DZ
 BOTTOM = -50.44586 * SCALE
 WALL = 2.4
 SIDE_FILLET = 2.5
+DISPLAY_X = 2.5
 ESP_X = -36.0
 ESP_Y = -16.5
 # PCB half-length 26 mm + rear wall 2.4 mm + .9 mm clearance.
@@ -35,12 +36,12 @@ def split_enclosure(outer, geometry):
     # ----- logement de l'ecran : glisse par le haut, retenu par le couvercle -----
     # Rainures en bas et a gauche seulement (levre avant 1,2 mm + appui arriere) ;
     # le haut et le cote droit (connecteur) restent degages, le couvercle ferme le haut.
-    boolean(env, frontbox(-53.2, 53.2, -27.2, 27.4, -4.9, -1.2), cut)      # poche 106,4 mm
+    boolean(env, frontbox(-53.2 + DISPLAY_X, 53.2 + DISPLAY_X, -27.2, 27.4, -4.9, -1.2), cut)      # poche 106,4 mm
     # Printed-screen correction, viewed from the front: left edge -2 mm,
     # right edge -4 mm (more masking on the right, less on the left).
-    boolean(env, frontbox(-43.4, 38.4, -24.4, v_split, -1.2, 1.5), cut)
-    boolean(env, frontbox(-41.4, 53.2, -24.4, 27.4, -6.7, -4.9), cut)      # fenetre arriere, puce et connecteur
-    boolean(env, frontbox(-53.2, 53.2, v_split, 27.4, -8, -4.9), cut)      # le couvercle ne pousse pas la dalle
+    boolean(env, frontbox(-43.4 + DISPLAY_X, 38.4 + DISPLAY_X, -24.4, v_split, -1.2, 1.5), cut)
+    boolean(env, frontbox(-41.4 + DISPLAY_X, 53.2 + DISPLAY_X, -24.4, 27.4, -6.7, -4.9), cut)      # fenetre arriere, puce et connecteur
+    boolean(env, frontbox(-53.2 + DISPLAY_X, 53.2 + DISPLAY_X, v_split, 27.4, -8, -4.9), cut)      # le couvercle ne pousse pas la dalle
 
     # ----- separation coque / couvercle -----
     lid_region = box(-100, 100, split, 100, rear - 1, 100)

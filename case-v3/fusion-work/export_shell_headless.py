@@ -81,9 +81,9 @@ def verify_shell(shell):
         pocket = Geometry.box(51.85, 56.55, design.BOTTOM - .1,
                               design.BOTTOM + 1.75, z - 2.35, z + 2.35)[0]
         assert pocket.intersect(shell).Volume() < 1e-6, 'Amplifier nut not accessible below'
-    window = Geometry.frontbox(-43.35, 38.35, -24.35, 24.75, -1.15, 1.45)[0]
+    window = Geometry.frontbox(-40.85, 40.85, -24.35, 24.75, -1.15, 1.45)[0]
     assert window.intersect(shell).Volume() < 1e-6, 'Display window obstructed'
-    right_mask = Geometry.frontbox(38.5, 42.3, -20, 20, -.9, -.2)[0]
+    right_mask = Geometry.frontbox(41.0, 44.8, -20, 20, -.9, -.2)[0]
     assert right_mask.cut(shell).Volume() < 1e-6, 'Missing right display mask'
     for x in (-13.5, 51.5):
         for y in (-32.5, -7.5):
@@ -94,7 +94,7 @@ def verify_shell(shell):
                 esp32_side_entry_nuts=0, esp32_flared_base_radius_mm=7,
                 esp32_bottom_nut_pocket_mm=[6.6, 6.6, 3.2],
                 foot_to_esp32_pocket_clearance_mm=foot_clearance,
-                amplifier_flared_base_radius_mm=7, amplifier_bottom_entry_nuts=2, amplifier_nut_pocket_mm=[4.8, 4.8, 1.8], display_window_x_mm=[-43.4, 38.4],
+                amplifier_flared_base_radius_mm=7, amplifier_bottom_entry_nuts=2, amplifier_nut_pocket_mm=[4.8, 4.8, 1.8], display_window_x_mm=[-40.9, 40.9], display_board_center_x_mm=2.5,
                 speaker_standoffs=False, speaker_head_recess_depth_mm=.8,
                 esp32_support_top_mm=top, support_tops='four complete coplanar annuli',
                 pcb_rear_clearance_mm=design.ESP_CENTER_FROM_REAR - 26 - design.WALL,

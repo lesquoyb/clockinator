@@ -4,7 +4,7 @@
       "volume_mm3": 108507.80994146681,
       "matches_current_geometry": true,
       "volume_tolerance_mm3": 0.2,
-      "volume_difference_mm3": 0.11911603888438549
+      "volume_difference_mm3": 0.11911603434418794
     },
     "Switch plate - KS33": {
       "volume_mm3": 7890.433250137461,
@@ -21,7 +21,7 @@
     },
     {
       "name": "Lid",
-      "volume_mm3": 95020.59951417887
+      "volume_mm3": 95020.5995141789
     },
     {
       "name": "Key Light - KS33",
@@ -56,5 +56,6 @@
       "volume_mm3": 593.9520000000005
     }
   ],
-  "archive_updated": true
+  "archive_updated": true,
+  "diffuser_center_x_mm": 0.0
 }
