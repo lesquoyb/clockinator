@@ -26,6 +26,12 @@ class Geometry:
         return [body[0].copy()]
 
     @staticmethod
+    def cone(x, y, z, xx, yy, zz, radius0, radius1):
+        direction = cq.Vector(xx - x, yy - y, zz - z)
+        return [cq.Solid.makeCone(radius0, radius1, direction.Length,
+                                 cq.Vector(x, y, z), direction.normalized())]
+
+    @staticmethod
     def boolean(target, tool, operation):
         methods = {'union': 'fuse', 'cut': 'cut', 'intersect': 'intersect'}
         target[0] = getattr(target[0], methods[operation])(tool[0]).clean()

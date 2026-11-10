@@ -42,6 +42,10 @@ def run(_context: str):
     def cylinder(x, y, z, xx, yy, zz, r):
         return mgr.createCylinderOrCone(point(x, y, z), r / 10, point(xx, yy, zz), r / 10)
 
+    def cone(x, y, z, xx, yy, zz, radius0, radius1):
+        return mgr.createCylinderOrCone(point(x, y, z), radius0 / 10,
+                                        point(xx, yy, zz), radius1 / 10)
+
     def rounded(x, z, width, depth, y0, y1, r=3):
         b = box(x - width / 2 + r, x + width / 2 - r, y0, y1, z - depth / 2, z + depth / 2)
         boolean(b, box(x - width / 2, x + width / 2, y0, y1, z - depth / 2 + r, z + depth / 2 - r), union)
@@ -129,7 +133,7 @@ def run(_context: str):
 
     # Common direct shell construction; no inherited cutouts or repair solids.
     from types import SimpleNamespace
-    geometry = SimpleNamespace(box=box, frontbox=frontbox, cylinder=cylinder,
+    geometry = SimpleNamespace(box=box, frontbox=frontbox, cylinder=cylinder, cone=cone,
         boolean=boolean, copy=mgr.copy, union=union, cut=cut, intersect=intersect)
     shell, lid = shell_geometry.split_enclosure(outer, geometry)
     shell_geometry.add_shell_features(shell, outer, geometry)

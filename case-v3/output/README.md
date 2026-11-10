@@ -1,5 +1,25 @@
 # v3 exports
 
+## Revision after the first shell print
+
+The current shell incorporates the first physical assembly feedback:
+
+- All four ESP32 nuts load from underneath. Their square pockets are 6.6 × 6.6 mm and 3.2 mm deep (increased from 5.8 × 5.8 × 2.6 mm after a tight-fit report). No side-entry nut pocket remains. The four underside-entry posts have sloping bases, 14 mm across at the floor and tapering to the 6.4 mm posts over 6.7 mm.
+- Both amplifier posts have sloping bases, 14 mm across at the floor, tapering to the 7.2 mm posts over 6.7 mm.
+- Both amplifier nuts use 4.8 × 4.8 mm pockets, widened from 4.4 × 4.4 mm, with the same 1.8 mm depth. They load from underneath, with through-bores instead of enclosed side-entry cavities. Longer M2 screws are required; measure the assembled stack before choosing their length.
+- Viewed from the front, the display window's left edge moves 2 mm left and its right edge moves 4 mm left. Its X bounds are now −43.4 to 38.4 mm, giving an 81.8 mm opening. The board pocket stays in place.
+- The four internal speaker standoffs are removed. The exterior screw-head recesses are reduced to 0.8 mm deep to retain 1.6 mm of rear-wall material. Screw heads may protrude; recheck speaker clearance and screw length with the actual speaker.
+- The two rear rubber-foot seats move 5 mm forward (Z = −99 mm instead of −104 mm) to clear the underside ESP32 nuts.
+- Switch-plate brackets are unchanged.
+
+**Native archive updated:** `clockinator-v3-assembly.f3d` includes all four
+underside ESP32 nut pockets, relocated rear feet and widened M2 nut pockets.
+`verification-fusion.json` confirms the shell and switch-plate volumes match
+the current exports.
+
+**Renders pending:** the images in `../renders/` still show the preceding
+revision. The current shell STL and STEP are checked by `verification-shell.json`.
+
 `switch-plate.stl` and the switch plate in `clockinator-v3-parts.step` have been
 regenerated without the old wire-routing notches. The plate is built directly;
 no cable cutouts are created and then filled back in. The three 14.2 mm KS33
@@ -54,17 +74,19 @@ tested; checking the model does not replace a physical test.
 
 ## Fusion archive and renders
 
-`clockinator-v3-assembly.f3d` has been rebuilt with the current versions of
-`build_v3.py`, `shell_geometry.py` and `switch_plate.py`. The shell and switch
-plate in the archive match the volumes of the latest exports, as checked in
-`verification-fusion.json`.
+The native archive includes the latest ESP32 and M2 changes.
+`verification-fusion.json` records the verified native export.
+
+To rebuild and export through Fusion's Scripts and Add-ins dialog, add the
+`../fusion-work/RefreshNativeV3` folder and run `RefreshNativeV3`. It opens the
+existing local archive in a new document, rebuilds it and exports the result.
 
 To update only the native archive after a build, run
 `../fusion-work/export_native_v3.py` in Fusion. The script checks the shell and
 switch plate before exporting. Keep both geometry modules alongside
 `build_v3.py`.
 
-The five views in `../renders/` come from the rebuilt assembly.
+The five views in `../renders/` show the assembly before the print-feedback revision.
 `../fusion-work/render_v3.py` prepares the presentation copy, then
 `../fusion-work/render_queue.py` starts the local renders in a separate script
 invocation. The diffuser variants are hidden in the presentation.

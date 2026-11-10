@@ -36,7 +36,9 @@ def split_enclosure(outer, geometry):
     # Rainures en bas et a gauche seulement (levre avant 1,2 mm + appui arriere) ;
     # le haut et le cote droit (connecteur) restent degages, le couvercle ferme le haut.
     boolean(env, frontbox(-53.2, 53.2, -27.2, 27.4, -4.9, -1.2), cut)      # poche 106,4 mm
-    boolean(env, frontbox(-41.4, 42.4, -24.4, v_split, -1.2, 1.5), cut)    # fenetre avant : levres gauche, droite, bas ; le haut est dans le couvercle
+    # Printed-screen correction, viewed from the front: left edge -2 mm,
+    # right edge -4 mm (more masking on the right, less on the left).
+    boolean(env, frontbox(-43.4, 38.4, -24.4, v_split, -1.2, 1.5), cut)
     boolean(env, frontbox(-41.4, 53.2, -24.4, 27.4, -6.7, -4.9), cut)      # fenetre arriere, puce et connecteur
     boolean(env, frontbox(-53.2, 53.2, v_split, 27.4, -8, -4.9), cut)      # le couvercle ne pousse pas la dalle
 
@@ -66,36 +68,33 @@ def add_shell_features(shell, outer, geometry):
             boss = cylinder(x, floor - .2, z, x, ESP_SUPPORT_TOP, z, 3.2)
             boolean(boss, copy(outer), intersect)
             boolean(shell, boss, union)
-            if rear_post:
-                # Reinforced foot and side-entry nut, above the rounded floor.
-                collar = cylinder(x, floor - .05, z, x, floor + 5.5, z, 4.2)
-                boolean(collar, copy(outer), intersect)
-                boolean(shell, collar, union)
-                boolean(shell, cylinder(x, floor + .2, z, x, esp_y, z, 1.7), cut)
-                boolean(shell, box(x - 2.9, x + 2.9, floor + .6, floor + 3.2, z, z + 8), cut)
-            else:
-                # Front fasteners enter through the flat underside.
-                boolean(shell, cylinder(x, y_bot - 1, z, x, esp_y, z, 1.7), cut)
-                boolean(shell, box(x - 2.9, x + 2.9, y_bot - 1, y_bot + 2.0, z - 2.9, z + 2.9), cut)
-    # amplificateur MAX98357A : deux plots M2 a la hauteur de l'ESP32, de l'autre cote ; broches vers l'ESP32,
-    # rangee de vis le long de la paroi (bornier cote paroi). L'ecrou M2 glisse de cote dans le plot.
+            # All four nuts load from below, with a broad sloping foot.
+            foot = geometry.cone(x, floor - .2, z, x, floor + 6.5, z, 7.0, 3.2)
+            boolean(foot, copy(outer), intersect)
+            boolean(shell, foot, union)
+            boolean(shell, cylinder(x, y_bot - 1, z, x, esp_y, z, 1.7), cut)
+            boolean(shell, box(x - 3.3, x + 3.3, y_bot - 1, y_bot + 3.2, z - 3.3, z + 3.3), cut)
+    # MAX98357A: two M2 posts, nuts inserted directly from underneath.
     amp_top = ESP_SUPPORT_TOP
     for z in (-84.5, -71.5):
         x = 54.2
         post = cylinder(x, floor - .2, z, x, amp_top, z, 3.6)
         boolean(post, copy(outer), intersect)
         boolean(shell, post, union)
-        boolean(shell, cylinder(x, amp_top - 9, z, x, amp_top + .5, z, 1.2), cut)
-        boolean(shell, box(x - 4.5, x + 2.1, amp_top - 4.2, amp_top - 2.4, z - 2.1, z + 2.1), cut)   # ecrou M2 glisse de cote dans le plot, dessus intact
+        foot = geometry.cone(x, floor - .2, z, x, floor + 6.5, z, 7.0, 3.6)
+        boolean(foot, copy(outer), intersect)
+        boolean(shell, foot, union)
+        boolean(shell, cylinder(x, y_bot - 1, z, x, amp_top + .5, z, 1.2), cut)
+        boolean(shell, box(x - 2.4, x + 2.4, y_bot - 1, y_bot + 1.8, z - 2.4, z + 2.4), cut)
     boolean(shell, box(esp_x - 4.8, esp_x + 4.8, esp_y - 1.44, esp_y + 3.46, rear - 2, rear + 5), cut)   # USB-C
     spk_up = 4.0                       # haut-parleur remonte : trous hors de l'arrondi du bas
     spk_dx = 0
     for x in [-13.5 + spk_dx, 51.5 + spk_dx]:
         for y in [-36.5 + spk_up, -11.5 + spk_up]:
-            boss = cylinder(x, y, rear + 2.2, x, y, rear + 5.4, 3.2)
-            boolean(shell, boss, union)
+            # Speaker tabs sit directly against the rear wall. Keep at least
+            # 1.6 mm of wall beneath the shallow exterior head recess.
             boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 6, 1.7), cut)
-            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 2.0, 3.1), cut)      # lamage de tete : la vis entre par l'exterieur, dans le filetage du haut-parleur
+            boolean(shell, cylinder(x, y, rear - 1, x, y, rear + .8, 3.1), cut)
     for x in range(-7 + spk_dx, 47 + spk_dx, 5):
         for y in [-31 + spk_up, -26 + spk_up, -21 + spk_up, -16 + spk_up]:
             boolean(shell, cylinder(x, y, rear - 1, x, y, rear + 3, 1.25), cut)
@@ -110,7 +109,7 @@ def add_shell_features(shell, outer, geometry):
             boolean(shell, cylinder(sx * 53, -6, z, sx * 53, 4.6, z, 1.7), cut)
     # patins : 4 logements dessous pour des patins adhesifs de 12 mm
     for x in (-50, 50):
-        for z in (-104, -6):      # hors des arrondis avant et arriere
+        for z in (-99, -6):      # hors des arrondis avant et arriere
             boolean(shell, cylinder(x, y_bot - 1, z, x, y_bot + 1.2, z, 6.4), cut)
 
     return shell

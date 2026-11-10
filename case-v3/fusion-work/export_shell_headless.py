@@ -63,7 +63,39 @@ def verify_shell(shell):
         if volume > .001:
             collisions.append((index, volume))
     assert not collisions, collisions
+    # Regression checks for changes prompted by the first physical print.
+    for x, z in centers:
+        pocket = Geometry.box(x - 3.25, x + 3.25, design.BOTTOM - .1,
+                              design.BOTTOM + 3.15, z - 3.25, z + 3.25)[0]
+        assert pocket.intersect(shell).Volume() < 1e-6, 'ESP32 nut not accessible below'
+        assert shell.isInside(cq.Vector(x + 4.5, design.BOTTOM + 3, z), 1e-6), 'Missing flared foot'
+    # Clearance from each square nut pocket to the circular rubber-foot seats.
+    foot_clearance = min(math.hypot(max(abs(x-fx)-3.3, 0), max(abs(z-fz)-3.3, 0))-6.4
+                         for x,z in centers for fx in (-50,50) for fz in (-99,-6))
+    assert foot_clearance > 2, 'Rubber foot overlaps or crowds an ESP32 nut pocket'
+    for z in (-84.5, -71.5):
+        assert shell.isInside(cq.Vector(54.2 - 4.8, design.BOTTOM + 3, z), 1e-6), 'Missing amplifier flared foot'
+        hole = Geometry.cylinder(54.2, design.BOTTOM - .1, z,
+                                 54.2, top + .1, z, 1.19)[0]
+        assert hole.intersect(shell).Volume() < 1e-6, 'Amplifier bore blocked'
+        pocket = Geometry.box(51.85, 56.55, design.BOTTOM - .1,
+                              design.BOTTOM + 1.75, z - 2.35, z + 2.35)[0]
+        assert pocket.intersect(shell).Volume() < 1e-6, 'Amplifier nut not accessible below'
+    window = Geometry.frontbox(-43.35, 38.35, -24.35, 24.75, -1.15, 1.45)[0]
+    assert window.intersect(shell).Volume() < 1e-6, 'Display window obstructed'
+    right_mask = Geometry.frontbox(38.5, 42.3, -20, 20, -.9, -.2)[0]
+    assert right_mask.cut(shell).Volume() < 1e-6, 'Missing right display mask'
+    for x in (-13.5, 51.5):
+        for y in (-32.5, -7.5):
+            space = Geometry.cylinder(x, y, rear + 2.41, x, y, rear + 5.5, 3.15)[0]
+            assert space.intersect(shell).Volume() < 1e-6, 'Speaker standoff remains'
     return dict(valid=True, solids=1, volume_mm3=shell.Volume(),
+                print_feedback_revision=True, esp32_bottom_entry_nuts=4,
+                esp32_side_entry_nuts=0, esp32_flared_base_radius_mm=7,
+                esp32_bottom_nut_pocket_mm=[6.6, 6.6, 3.2],
+                foot_to_esp32_pocket_clearance_mm=foot_clearance,
+                amplifier_flared_base_radius_mm=7, amplifier_bottom_entry_nuts=2, amplifier_nut_pocket_mm=[4.8, 4.8, 1.8], display_window_x_mm=[-43.4, 38.4],
+                speaker_standoffs=False, speaker_head_recess_depth_mm=.8,
                 esp32_support_top_mm=top, support_tops='four complete coplanar annuli',
                 pcb_rear_clearance_mm=design.ESP_CENTER_FROM_REAR - 26 - design.WALL,
                 usb_opening_mm=[9.6, 4.9], pcb_relief_present=False,

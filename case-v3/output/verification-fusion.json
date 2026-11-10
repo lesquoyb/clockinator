@@ -1,19 +1,23 @@
 {
   "parts": {
     "Shell": {
-      "volume_mm3": 107383.50653701874,
-      "matches_current_geometry": true
+      "volume_mm3": 108507.80994146681,
+      "matches_current_geometry": true,
+      "volume_tolerance_mm3": 0.2,
+      "volume_difference_mm3": 0.11911603888438549
     },
     "Switch plate - KS33": {
       "volume_mm3": 7890.433250137461,
-      "matches_current_geometry": true
+      "matches_current_geometry": true,
+      "volume_tolerance_mm3": 0.2,
+      "volume_difference_mm3": 6.912159733474255e-11
     }
   },
   "native_body_count": 10,
   "native_parts": [
     {
       "name": "Shell",
-      "volume_mm3": 107383.50653701874
+      "volume_mm3": 108507.80994146681
     },
     {
       "name": "Lid",

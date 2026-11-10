@@ -1,7 +1,30 @@
 {
   "valid": true,
   "solids": 1,
-  "volume_mm3": 107383.50653701602,
+  "volume_mm3": 108507.69082542793,
+  "print_feedback_revision": true,
+  "esp32_bottom_entry_nuts": 4,
+  "esp32_side_entry_nuts": 0,
+  "esp32_flared_base_radius_mm": 7,
+  "esp32_bottom_nut_pocket_mm": [
+    6.6,
+    6.6,
+    3.2
+  ],
+  "foot_to_esp32_pocket_clearance_mm": 5.3239922077922035,
+  "amplifier_flared_base_radius_mm": 7,
+  "amplifier_bottom_entry_nuts": 2,
+  "amplifier_nut_pocket_mm": [
+    4.8,
+    4.8,
+    1.8
+  ],
+  "display_window_x_mm": [
+    -43.4,
+    38.4
+  ],
+  "speaker_standoffs": false,
+  "speaker_head_recess_depth_mm": 0.8,
   "esp32_support_top_mm": -18.15,
   "support_tops": "four complete coplanar annuli",
   "pcb_rear_clearance_mm": 0.9000000000000008,
@@ -13,9 +36,9 @@
   "esp32_reference_solids_checked": 142,
   "esp32_collisions": [],
   "cadquery_version": "2.7.0",
-  "stl_triangles": 63218,
+  "stl_triangles": 63648,
   "stl_watertight": true,
-  "stl_volume_mm3": 107378.50487266012,
+  "stl_volume_mm3": 108500.1977903526,
   "print_min_z_mm": -0.0,
   "step_solids": 8
 }
