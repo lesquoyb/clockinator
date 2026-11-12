@@ -79,8 +79,7 @@ def main():
     solids[plate_index] = plate
     assembly = cq.Assembly(name='Enclosure v3 - smooth')
     names = ['Shell', 'Lid', 'Key Light - KS33', 'Key Stop - KS33',
-             'Key Snooze - KS33', 'Switch plate - KS33', 'Diffuser slot plug',
-             'Diffuser white - 0.8 mm']
+             'Key Snooze - KS33', 'Switch plate - KS33']
     assert len(solids) == len(names) and plate_index == 5, 'Unexpected source assembly'
     for solid, name in zip(solids, names):
         assembly.add(solid, name=name)

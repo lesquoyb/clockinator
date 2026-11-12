@@ -12,6 +12,6 @@
   "stl_watertight": true,
   "stl_volume_mm3": 7890.460439826707,
   "print_min_z_mm": 0.0,
-  "step_solids": 8,
+  "step_solids": 6,
   "cadquery_version": "2.7.0"
 }

@@ -149,8 +149,7 @@ def run(_context: str):
     boolean(lid, bay, cut)
     boolean(lid, box(-26, 26, 28.2, 33.8, -28, -7.4), cut)                    # chambre
     boolean(lid, box(-26, 26, 26.6, 28.3, -30.0, -18.4), cut)                # la chambre descend sous la LED abaissee
-    boolean(lid, box(-26, 26, 26, 28.3, -15.2, -7.4), cut)                    # fenetre de sortie
-    boolean(lid, box(-27.4, 66, 28.2, 29.7, -16.0, -6.2), cut)                # glissiere du diffuseur, entree par le cote droit
+    boolean(lid, box(-26, 26, 26, 28.3, -16.5, -5.9), cut)                    # sortie elargie vers le nez de la visiere
     boolean(lid, box(-12, 12, 28.2, 31, -18, -16.8), union)                   # ecran contre la vue directe
     boolean(lid, cylinder(0, led_y, -31.4, 0, led_y, -27.9, 2.6), cut)        # trou LED 5 mm
     boolean(lid, cylinder(0, led_y, -31.4, 0, led_y, -29.4, 3.1), cut)        # logement de la collerette
@@ -170,19 +169,6 @@ def run(_context: str):
     for x, z in joints:
         boolean(lid, cylinder(x, mount_y - 1, z, x, roof_y + 5, z, 1.7), cut)
         boolean(lid, cylinder(x, roof_y - 1.8, z, x, roof_y + 5, z, 3.1), cut)
-
-    # ----- bouchon opaque de la rainure du diffuseur -----
-    plug = box(27.1, 65.0, 28.35, 29.55, -15.85, -6.35)
-    boolean(plug, box(65.0, 66.8, 27.6, 30.3, -16.6, -5.6), union)
-
-    # ----- diffuseurs a essayer -----
-    def diffuser(t, dz=0):
-        d = box(-26.9, 26.9, 28.3, 28.3 + t, -15.9, -6.7)
-        if dz:
-            m = adsk.core.Matrix3D.create()
-            m.translation = adsk.core.Vector3D.create(0, 0, dz / 10)
-            assert mgr.transform(d, m)
-        return d
 
     # ----- reference LED 5 mm -----
     led = cylinder(0, led_y, -30.4, 0, led_y, -21.0, 2.5)
@@ -209,20 +195,12 @@ def run(_context: str):
     base.startEdit()
     parts = [('Boitier - coque', shell), ('Couvercle - dessus, boutons, LED, retenue ecran', lid)]
     parts += list(keep.items())
-    parts += [('Bouchon rainure diffuseur', plug)]
-    parts += [('Diffuseur blanc - 0.8 mm', diffuser(.8)),
-              ('Diffuseur blanc - 0.6 mm (variante)', diffuser(.6, 70)),
-              ('Diffuseur blanc - 1.2 mm (variante)', diffuser(1.2, 90))]
     EN = {'Boitier - coque': 'Shell',
           'Couvercle - dessus, boutons, LED, retenue ecran': 'Lid',
           'Touche Lumiere - KS33': 'Key Light - KS33',
           'Touche Stop - KS33': 'Key Stop - KS33',
           'Touche Snooze - KS33': 'Key Snooze - KS33',
-          'Platine KS33 - montage par dessous': 'Switch plate - KS33',
-          'Bouchon rainure diffuseur': 'Diffuser slot plug',
-          'Diffuseur blanc - 0.8 mm': 'Diffuser white - 0.8 mm',
-          'Diffuseur blanc - 0.6 mm (variante)': 'Diffuser white - 0.6 mm (variant)',
-          'Diffuseur blanc - 1.2 mm (variante)': 'Diffuser white - 1.2 mm (variant)'}
+          'Platine KS33 - montage par dessous': 'Switch plate - KS33'}
     for name, shape in parts:
         comp.bRepBodies.add(shape, base)
     base.finishEdit()

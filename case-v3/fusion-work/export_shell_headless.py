@@ -131,11 +131,10 @@ def main():
     shell = make_shell()
     report = verify_shell(shell)
     source = cq.importers.importStep(str(OUTPUT / 'clockinator-v3-parts.step')).solids().vals()
-    assert len(source) == 8 and source[0].BoundingBox().ylen > 60
+    assert len(source) == 6 and source[0].BoundingBox().ylen > 60
     source[0] = shell
     names = ['Shell', 'Lid', 'Key Light - KS33', 'Key Stop - KS33',
-             'Key Snooze - KS33', 'Switch plate - KS33', 'Diffuser slot plug',
-             'Diffuser white - 0.8 mm']
+             'Key Snooze - KS33', 'Switch plate - KS33']
     args.output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=args.output_dir) as temporary:
         temporary = Path(temporary)
@@ -146,7 +145,7 @@ def main():
         assembly.export(str(step))
         step.write_text('\n'.join(line.rstrip() for line in step.read_text().splitlines()) + '\n')
         restored = cq.importers.importStep(str(step)).solids().vals()
-        assert len(restored) == 8
+        assert len(restored) == 6
         for before, after in zip(source, restored):
             assert after.isValid() and abs(before.Volume() - after.Volume()) < .01
             a, b = before.BoundingBox(), after.BoundingBox()
@@ -161,7 +160,7 @@ def main():
         stl = temporary / 'shell.stl'
         cq.exporters.export(printable, str(stl), tolerance=.01, angularTolerance=math.radians(5))
         report.update(verify_mesh(stl, shell.Volume()))
-        report['step_solids'] = 8
+        report['step_solids'] = len(restored)
         (temporary / 'verification-shell.json').write_text(json.dumps(report, indent=2) + '\n')
         for filename in ('clockinator-v3-parts.step', 'shell.stl', 'verification-shell.json'):
             (temporary / filename).replace(args.output_dir / filename)

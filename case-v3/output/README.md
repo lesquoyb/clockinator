@@ -1,5 +1,12 @@
 # v3 exports
 
+## Open light exit
+
+The downward light exit is 52 × 10.6 mm, extended 1.5 mm toward the visor tip to open the path toward the lower part of the display. The LED baffle remains in place, and
+closing the former side slot removes the need for a diffuser or plug. The
+old diffuser STL files fit earlier lids. Optical performance should be checked
+on a physical print.
+
 ## Lid fit revision
 
 The lid guide has 0.8 mm clearance at each side and at the rear. Continuous
@@ -17,7 +24,7 @@ The current shell incorporates the first physical assembly feedback:
 - All four ESP32 nuts load from underneath. Their square pockets are 6.6 × 6.6 mm and 3.2 mm deep (increased from 5.8 × 5.8 × 2.6 mm after a tight-fit report). No side-entry nut pocket remains. The four underside-entry posts have sloping bases, 14 mm across at the floor and tapering to the 6.4 mm posts over 6.7 mm.
 - Both amplifier posts have sloping bases, 14 mm across at the floor, tapering to the 7.2 mm posts over 6.7 mm.
 - Both amplifier nuts use 4.8 × 4.8 mm pockets, widened from 4.4 × 4.4 mm, with the same 1.8 mm depth. They load from underneath, with through-bores instead of enclosed side-entry cavities. Longer M2 screws are required; measure the assembled stack before choosing their length.
-- Viewed from the front, the display window's left edge moves 2 mm left and its right edge moves 4 mm left. The complete board pocket and window then shift 2.5 mm right to center the visible area on the facade. Final window X bounds are −40.9 to 40.9 mm (81.8 mm wide); the board center is X = 2.5 mm. The diffuser and its 52 mm light exit remain centered at X = 0, aligned with the visible window.
+- Viewed from the front, the display window's left edge moves 2 mm left and its right edge moves 4 mm left. The complete board pocket and window then shift 2.5 mm right to center the visible area on the facade. Final window X bounds are −40.9 to 40.9 mm (81.8 mm wide); the board center is X = 2.5 mm. The 52 mm light exit remains centered at X = 0, aligned with the visible window.
 - The four internal speaker standoffs are removed. The exterior screw-head recesses are reduced to 0.8 mm deep to retain 1.6 mm of rear-wall material. Screw heads may protrude; recheck speaker clearance and screw length with the actual speaker.
 - The two rear rubber-foot seats move 5 mm forward (Z = −99 mm instead of −104 mm) to clear the underside ESP32 nuts.
 - Switch-plate brackets are unchanged.
@@ -48,7 +55,7 @@ python3 case-v3/fusion-work/export_plate_headless.py
 Run this command from the repository root. It requires CadQuery (the version
 used for validation is recorded in `verification-plate.json`). It replaces
 only the switch plate in the STEP file and re-exports its STL, then checks the
-volumes and dimensions of all eight STEP solids and verifies that the mesh is
+volumes and dimensions of all six STEP solids and verifies that the mesh is
 watertight. The other STL files remain unchanged. Results are recorded in
 `verification-plate.json`.
 
@@ -101,7 +108,7 @@ switch plate before exporting. Keep both geometry modules alongside
 The five views in `../renders/` show the current assembly with an e-paper mock display.
 `../fusion-work/render_v3.py` prepares the presentation copy, then
 `../fusion-work/render_queue.py` starts the local renders in a separate script
-invocation. The diffuser variants are hidden in the presentation.
+invocation.
 
 To reproduce the e-paper renders through the Fusion dialog, add the
 `../fusion-work/RenderEinkV3` folder. Run it once to prepare the scene and

@@ -41,5 +41,5 @@
   "stl_watertight": true,
   "stl_volume_mm3": 108500.1978010331,
   "print_min_z_mm": -0.0,
-  "step_solids": 8
+  "step_solids": 6
 }

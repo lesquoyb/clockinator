@@ -10,10 +10,6 @@ FILES = {
     'Key Stop - KS33': ('key-stop', True),
     'Key Snooze - KS33': ('key-snooze', True),
     'Switch plate - KS33': ('switch-plate', False),
-    'Diffuser slot plug': ('diffuser-plug', False),
-    'Diffuser white - 0.8 mm': ('diffuser-0.8mm', False),
-    'Diffuser white - 0.6 mm (variant)': ('diffuser-0.6mm', False),
-    'Diffuser white - 1.2 mm (variant)': ('diffuser-1.2mm', False),
 }
 
 
