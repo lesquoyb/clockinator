@@ -1,9 +1,9 @@
 {
-  "stl_triangles": 26198,
+  "stl_triangles": 26190,
   "stl_watertight": true,
-  "stl_volume_mm3": 96211.71949031024,
+  "stl_volume_mm3": 103050.33945521017,
   "print_min_z_mm": 0.0,
-  "volume_mm3": 96215.3615305598,
+  "volume_mm3": 103053.98077740612,
   "guide_clearance_per_side_mm": 0.8,
   "display_pocket_width_mm": 106.4,
   "closure_offsets_checked_mm": [
@@ -20,5 +20,7 @@
   ],
   "side_slot_closed": true,
   "led_baffle_present": true,
-  "native_volume_mm3": 96215.51842356869
+  "guide_reaches_ceiling": true,
+  "switch_plate_clearance_checked": true,
+  "native_volume_mm3": 103054.13813525702
 }

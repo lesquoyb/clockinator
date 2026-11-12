@@ -116,22 +116,24 @@ def add_shell_features(shell, outer, geometry):
     return shell
 
 
-def add_lid_fitting(lid, geometry):
+def add_lid_fitting(lid, outer, geometry):
     box, frontbox, boolean = geometry.box, geometry.frontbox, geometry.boolean
     union, cut = geometry.union, geometry.cut
     split, rear = 5.0, REAR
     ZA, ZB = -94.7 + DZ, -60.3 + DZ
-    # Guide tips leave 0.8 mm against each mating wall. Continuous roots
-    # join the guides to the lid walls above the seam, including at the ends.
-    skirt = box(-63.1, 63.1, split, split + 2, rear + 1.9, rear + 5)
+    # Continue the solid ribs into the ceiling. The 60.9 mm inner edge
+    # leaves 0.5 mm to the switch plate on either side.
+    ceiling_overlap = 20.6
+    skirt = box(-63.1, 63.1, split, ceiling_overlap, rear + 1.9, rear + 5)
     boolean(skirt, box(-61.8, 61.8, split - 2, split + .6, rear + 3.2, rear + 5), union)
-    for x0, x1, root_x0, root_x1 in ((-61.8, -60, -63.1, -60), (60, 61.8, 60, 63.1)):
+    for x0, x1, root_x0, root_x1 in ((-61.8, -60.9, -63.1, -60.9), (60.9, 61.8, 60.9, 63.1)):
         rail = box(x0, x1, split - 2, split + .6, rear + 3.2, -46)
         for bracket_z in (ZA, ZB):
             boolean(rail, box(x0 - .1, x1 + .1, split - 3, split - .05,
                               bracket_z - 4.3, bracket_z + 4.3), cut)
-        boolean(rail, box(root_x0, root_x1, split, split + 2, rear + 3.2, -46), union)
+        boolean(rail, box(root_x0, root_x1, split, ceiling_overlap, rear + 3.2, -46), union)
         boolean(skirt, rail, union)
+    boolean(skirt, geometry.copy(outer), geometry.intersect)
     boolean(lid, skirt, union)
 
     # Continue the lower PCB pocket through the lid, with clearance for

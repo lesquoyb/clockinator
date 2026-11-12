@@ -140,7 +140,7 @@ def run(_context: str):
     joints = [(sx * 53.0, z) for sx in (-1, 1) for z in (ZA, ZB)]
 
     # ----- couvercle : vis, jupe de centrage -----
-    shell_geometry.add_lid_fitting(lid, geometry)
+    shell_geometry.add_lid_fitting(lid, outer, geometry)
 
     # ----- couvercle : chambre LED, visiere, diffuseur -----
     led_y = 29.5                      # LED abaissee (etait 31)

@@ -10,8 +10,9 @@ on a physical print.
 ## Lid fit revision
 
 The lid guide has 0.8 mm clearance at each side and at the rear. Continuous
-ribs join the guide to the lid walls, with relief below the seam around the
-switch-plate brackets. The lid continues the 106.4 mm screen pocket from the
+solid ribs run from the guide to the inner ceiling on both sides and at the rear.
+The side ribs leave 0.5 mm clearance to the switch plate, with relief below
+the seam around its brackets. The lid continues the 106.4 mm screen pocket from the
 shell and adds clearance for the top edge and rear components.
 
 `verification-lid.json` records the lid mesh and fit checks. The existing
