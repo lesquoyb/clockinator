@@ -7,3 +7,4 @@
 *.jks
 *.keystore
 **/__pycache__/
+/case

@@ -24,11 +24,11 @@ What to buy and what to print for the smooth enclosure. No prices. Screw lengths
 | ---: | --- | --- |
 | 4 | M3 x 25 screw | Lid + switch plate + shell (one screw per point) |
 | 4 | M3 nut | Under the switch-plate brackets, slid in from the side |
-| 4 | M3 x 30 screw | ESP32, underside-entry posts; confirm length after printing |
+| 4 | M3 x 25 screw | ESP32: 21.23 mm from the support top to the nut seat, leaving 3.77 mm for the PCB and nut |
 | 4 | M3 nut | ESP32: all 4 inserted from underneath |
 | 4 | M3 x 8 screw (provisional) | Speaker: enters from outside the rear wall, through the speaker's plastic tab; recheck length with the standoffs removed |
 | 4 | M3 nut | Speaker, on the far side of the tab, inside the speaker's own space |
-| 2 | M2 screw, length to measure | MAX98357A: now passes through the full post to an underside nut; the former 8 mm screw is too short |
+| 2 | M2 x 26 screw | MAX98357A: 22.63 mm from the support top to the nut seat. With a 1 mm PCB and a nut up to 2 mm thick, 26 mm passes through the full nut. Cut a longer screw to length if needed |
 | 2 | M2 nut | MAX98357A, inserted from underneath |
 
 Total: **12 M3 nuts** (4 switch plate + 4 ESP32 + 4 speaker) and **2 M2 nuts**. Keep a few spare screws and nuts. Use cylindrical (ISO 4762) or pan heads; M3 heads at most 5.5 mm across.
