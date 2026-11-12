@@ -73,7 +73,7 @@ Scanning a tag stops the matching event only when the Android app detects it as 
 - **Stop** silences the current event and cancels its pending snooze. It does not delete the routine: the next scheduled occurrence remains available.
 - **Snooze** uses the routine's configured snooze durations. Repeated presses cycle through those durations, including while a snooze is pending. With no configured duration, there is nothing to schedule.
 - **Sound** comes from an uploaded WAV file or the built-in melody. The app provides five non-mute volume levels and a five-second preview; a scheduled alarm takes priority over a preview.
-- **Light** can be switched on or off and its RGB colour configured from the app. The firmware retains the colour. The physical light button is currently disabled by `LIGHT_BUTTON_ENABLED = false`; enabling it requires wiring GPIO34 with an external pull-up.
+- **Light** can be switched on or off and its RGB colour configured from the app. The firmware retains the colour. The physical light button toggles the light and connects GPIO21 to GND. The firmware enables the internal pull-up.
 - **Synchronization** mirrors clock stop and snooze actions to the phone when communication is available. While disconnected, the devices cannot immediately mirror each other's actions.
 
 The routine list and pending snooze live in RAM. Wi-Fi credentials, volume, light colour and display refresh preferences are retained separately in flash. A power interruption therefore requires a fresh time/routine synchronization from the phone.

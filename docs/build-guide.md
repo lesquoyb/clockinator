@@ -43,13 +43,12 @@ connector through the opening before completing assembly.
 | --- | --- |
 | Stop | GPIO32 to GND; internal pull-up enabled |
 | Snooze | GPIO33 to GND; internal pull-up enabled |
-| Light button | GPIO34 to GND, with an external pull-up to 3.3 V; currently disabled in firmware |
+| Light button | GPIO21 to GND; internal pull-up enabled |
 | RGB LED | Red GPIO13, green GPIO12, blue GPIO14; one series resistor per colour as listed in the BOM |
 
 The default firmware uses `LIGHT_COMMON_ANODE = false`. Match the LED's common
-connection and this constant to your actual LED. The optional light switch is
-gated by `LIGHT_BUTTON_ENABLED`; it is not functional merely because its key
-has been printed. The v3 BOM's light-sensor module is not integrated into the
+connection and this constant to your actual LED. The physical light switch toggles the RGB light. The v3 BOM's
+light-sensor module is not integrated into the
 enclosure or needed for the current light control.
 
 ## Assembly sequence

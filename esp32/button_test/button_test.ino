@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include "DebouncedButton.h"
 
-constexpr int PINS[] = {32, 33, 14};
+constexpr int PINS[] = {32, 33, 21};
 DebouncedButton buttons[3];
 
 void setup() {

@@ -5,7 +5,7 @@
 // Each switch connects its GPIO to GND. No matrix or diodes are needed.
 constexpr int STOP_BUTTON_PIN = 32;
 constexpr int SNOOZE_BUTTON_PIN = 33;
-constexpr int LIGHT_BUTTON_PIN = 34;
+constexpr int LIGHT_BUTTON_PIN = 21;
 constexpr int LIGHT_RED_PIN = 13, LIGHT_GREEN_PIN = 12, LIGHT_BLUE_PIN = 14;
 constexpr bool LIGHT_COMMON_ANODE = false;
 static DebouncedButton stopButton, snoozeButton, lightButton;

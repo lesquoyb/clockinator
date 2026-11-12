@@ -14,7 +14,6 @@ What to buy and what to print for the smooth enclosure. No prices. Screw lengths
 | 1 | 5 mm RGB LED, 4 legs | Diffused preferred; common anode or cathode as set by `COMMON_ANODE` in the firmware |
 | 3 | 330 ohm resistor | One per LED colour (GPIO 13, 12, 14) |
 | 1 | LM393 light sensor module (photoresistor) | Used by `lighting_test`; **no place for it in the enclosure yet** |
-| 1 | ~10 kohm pull-up resistor to 3.3 V | For the light switch on GPIO34, which has no internal pull-up |
 | - | Thin flexible wire, heat-shrink tubing, solder | |
 | 1 | USB-C cable | Powers everything |
 
