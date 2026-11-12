@@ -484,6 +484,7 @@ void serviceWifi() {
  * setup / loop
  * -------------------------------------------------------------------------*/
 void setup() {
+    Serial.begin(115200);
     /* Create the command queue before starting anything that might use it. */
     cmdQueue = xQueueCreate(8, sizeof(PendingCommand));
     wifiConfigQueue = xQueueCreate(1, sizeof(WifiCredentials));
@@ -534,5 +535,9 @@ void loop() {
     applyPhysicalControls();
     refreshVolumeDisplay();
 
-    delay(100);
+    // Keep the background loop cadence while sampling buttons during its idle wait.
+    for (int elapsedMs = 0; elapsedMs < 100; elapsedMs += 10) {
+        delay(10);
+        servicePhysicalControls();
+    }
 }

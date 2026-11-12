@@ -9,6 +9,7 @@ constexpr int LIGHT_BUTTON_PIN = 21;
 constexpr int LIGHT_RED_PIN = 13, LIGHT_GREEN_PIN = 12, LIGHT_BLUE_PIN = 14;
 constexpr bool LIGHT_COMMON_ANODE = false;
 static DebouncedButton stopButton, snoozeButton, lightButton;
+static int lastLightButtonLevel = HIGH;
 static bool lightOn = false;
 static int lightRed = 255, lightGreen = 255, lightBlue = 255;
 static int physicalAction = 0; // 1 = stop (priority), 2 = cycle snooze
@@ -61,6 +62,9 @@ void initPhysicalControls() {
     pinMode(STOP_BUTTON_PIN, INPUT_PULLUP);
     pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
     pinMode(LIGHT_BUTTON_PIN, INPUT_PULLUP);
+    lastLightButtonLevel = digitalRead(LIGHT_BUTTON_PIN);
+    Serial.printf("[light] GPIO%d configured as INPUT_PULLUP, initial level=%d\n",
+                  LIGHT_BUTTON_PIN, lastLightButtonLevel);
     pinMode(LIGHT_RED_PIN, OUTPUT);
     pinMode(LIGHT_GREEN_PIN, OUTPUT);
     pinMode(LIGHT_BLUE_PIN, OUTPUT);
@@ -72,7 +76,13 @@ void servicePhysicalControls() {
     const uint32_t now = millis();
     const bool stopPressed = stopButton.update(digitalRead(STOP_BUTTON_PIN) == LOW, now) == 1;
     const bool snoozePressed = snoozeButton.update(digitalRead(SNOOZE_BUTTON_PIN) == LOW, now) == 1;
-    if (lightButton.update(digitalRead(LIGHT_BUTTON_PIN) == LOW, now) == 1) {
+    const int lightButtonLevel = digitalRead(LIGHT_BUTTON_PIN);
+    if (lightButtonLevel != lastLightButtonLevel) {
+        lastLightButtonLevel = lightButtonLevel;
+        Serial.printf("[light] GPIO%d level=%d\n", LIGHT_BUTTON_PIN, lightButtonLevel);
+    }
+    if (lightButton.update(lightButtonLevel == LOW, now) == 1) {
+        Serial.printf("[light] press accepted, LED %s\n", lightOn ? "off" : "on");
         setClockLight(!lightOn);
     }
     if (stopPressed && (isRinging || hasPendingSnooze())) {

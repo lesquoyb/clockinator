@@ -12,6 +12,8 @@ The firmware is intended for a compatible ESP32 board connected to:
 - an I²S audio amplifier and speaker;
 - one or more NFC tags for the phone drop-off and morning checkpoints.
 
+[Wiring diagram](design/clockinator-wiring.svg) · [PNG version](design/clockinator-wiring.png)
+
 Pins defined by the firmware:
 
 | Function | ESP32 GPIO |
