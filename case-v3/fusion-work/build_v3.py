@@ -140,11 +140,7 @@ def run(_context: str):
     joints = [(sx * 53.0, z) for sx in (-1, 1) for z in (ZA, ZB)]
 
     # ----- couvercle : vis, jupe de centrage -----
-    skirt = box(-62.6, -60.8, split - 2, split + .6, rear + 2.4, -46)
-    boolean(skirt, box(60.8, 62.6, split - 2, split + .6, rear + 2.4, -46), union)
-    boolean(skirt, box(-62.6, 62.6, split - 2, split + .6, rear + 2.4, rear + 4.2), union)
-    boolean(skirt, box(-63, 63, 1, 5.7, -98.6 + DZ, -56.4 + DZ), cut)               # la jupe laisse la place aux equerres de la platine
-    boolean(lid, skirt, union)
+    shell_geometry.add_lid_fitting(lid, geometry)
 
     # ----- couvercle : chambre LED, visiere, diffuseur -----
     led_y = 29.5                      # LED abaissee (etait 31)

@@ -1,0 +1,18 @@
+{
+  "stl_triangles": 26282,
+  "stl_watertight": true,
+  "stl_volume_mm3": 95769.07264258867,
+  "print_min_z_mm": 0.0,
+  "volume_mm3": 95772.70556773139,
+  "guide_clearance_per_side_mm": 0.8,
+  "display_pocket_width_mm": 106.4,
+  "closure_offsets_checked_mm": [
+    0,
+    0.5,
+    1,
+    2,
+    3
+  ],
+  "native_volume_mm3": 95772.86303019177,
+  "screen_clearance_checked_at_closure_offsets": true
+}

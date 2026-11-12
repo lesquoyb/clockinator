@@ -1,5 +1,15 @@
 # v3 exports
 
+## Lid fit revision
+
+The lid guide has 0.8 mm clearance at each side and at the rear. Continuous
+ribs join the guide to the lid walls, with relief below the seam around the
+switch-plate brackets. The lid continues the 106.4 mm screen pocket from the
+shell and adds clearance for the top edge and rear components.
+
+`verification-lid.json` records the lid mesh and fit checks. The existing
+renders show the exterior before this lid fit revision.
+
 ## Revision after the first shell print
 
 The current shell incorporates the first physical assembly feedback:
