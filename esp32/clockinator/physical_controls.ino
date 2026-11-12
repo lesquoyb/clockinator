@@ -6,8 +6,6 @@
 constexpr int STOP_BUTTON_PIN = 32;
 constexpr int SNOOZE_BUTTON_PIN = 33;
 constexpr int LIGHT_BUTTON_PIN = 34;
-// Enable only once wired. GPIO34 needs an external pull-up to 3.3 V.
-constexpr bool LIGHT_BUTTON_ENABLED = false;
 constexpr int LIGHT_RED_PIN = 13, LIGHT_GREEN_PIN = 12, LIGHT_BLUE_PIN = 14;
 constexpr bool LIGHT_COMMON_ANODE = false;
 static DebouncedButton stopButton, snoozeButton, lightButton;
@@ -62,7 +60,7 @@ void initPhysicalControls() {
     }
     pinMode(STOP_BUTTON_PIN, INPUT_PULLUP);
     pinMode(SNOOZE_BUTTON_PIN, INPUT_PULLUP);
-    if (LIGHT_BUTTON_ENABLED) pinMode(LIGHT_BUTTON_PIN, INPUT);
+    pinMode(LIGHT_BUTTON_PIN, INPUT_PULLUP);
     pinMode(LIGHT_RED_PIN, OUTPUT);
     pinMode(LIGHT_GREEN_PIN, OUTPUT);
     pinMode(LIGHT_BLUE_PIN, OUTPUT);
@@ -74,7 +72,7 @@ void servicePhysicalControls() {
     const uint32_t now = millis();
     const bool stopPressed = stopButton.update(digitalRead(STOP_BUTTON_PIN) == LOW, now) == 1;
     const bool snoozePressed = snoozeButton.update(digitalRead(SNOOZE_BUTTON_PIN) == LOW, now) == 1;
-    if (LIGHT_BUTTON_ENABLED && lightButton.update(digitalRead(LIGHT_BUTTON_PIN) == LOW, now) == 1) {
+    if (lightButton.update(digitalRead(LIGHT_BUTTON_PIN) == LOW, now) == 1) {
         setClockLight(!lightOn);
     }
     if (stopPressed && (isRinging || hasPendingSnooze())) {
