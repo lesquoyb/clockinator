@@ -2,6 +2,8 @@
 
 **A smart alarm clock synced with your phone, so you can leave your phone outside the bedroom.**
 
+**[Read the illustrated assembly manual and app tutorials (French)](https://lesquoyb.github.io/clockinator/)**
+
 Clockinator helps you put your phone down in the evening and get out of bed in the morning. Set your routines in the Android app, synchronize the clock, and leave your phone at its charging spot. The clock can ring in the bedroom while the phone stays elsewhere.
 
 A routine has a **Focus** time, an optional **Bedtime** reminder, and a **Wake-up** alarm. Two NFC tags help anchor the routine: one where you leave your phone, another where you start your day. Physical Stop and Snooze buttons remain available on the clock.
@@ -9,8 +11,6 @@ A routine has a **Focus** time, an optional **Bedtime** reminder, and a **Wake-u
 No account or cloud service is required. The app and clock communicate over Bluetooth, with optional local Wi-Fi. After synchronization, the powered clock follows its schedule without a continuous phone connection. After a clock restart, reconnect the phone to restore time and routines.
 
 > **Work in progress.** The enclosure and electronics are prototypes; the complete hardware setup has not yet been validated. Images below are CAD renders, not photographs of an assembled product.
-
-[Manuel de montage et tutoriels (français)](https://lesquoyb.github.io/clockinator/) · [Sources du manuel](docs/index.html)
 
 ## The clock
 
@@ -20,12 +20,14 @@ No account or cloud service is required. The app and clock communicate over Blue
 
 The v3 enclosure combines a 3.7-inch e-paper display, a speaker, three keys and a light diffuser. A separate [phone dock](case-dock/README.md) can hold the phone, a Qi charging module and an NFC tag.
 
+The Clockinator enclosure takes inspiration from the iPhone StandBy Mode Dock designed with OVERWERK, which in turn draws on Braun’s 1976 DN 40 electronic alarm clock by Dieter Rams and Dietrich Lubs. [iPhone StandBy Mode Dock on MakerWorld](https://makerworld.com/fr/models/615378-iphone-standby-mode-dock-designed-with-overwerk?from=search#profileId-538769) · [Braun design catalogue](https://assets.ctfassets.net/4m4ajbg1fhw2/2bT7ocvKzdTJOuLgFm88ca/c5265eca3453af67716293c7b8937c10/Braun-Products.pdf)
+
 ## Documentation
 
 | I want to… | Guide |
 | --- | --- |
 | Understand routines, NFC, synchronization and offline behaviour | [How it works](docs/how-it-works.md) |
-| Choose parts, wire and assemble the clock | [Build guide](docs/build-guide.md) and [v3 bill of materials](case-v3/BOM.md) |
+| Choose parts, wire and assemble the clock | [Illustrated assembly manual (French)](https://lesquoyb.github.io/clockinator/) and [v3 bill of materials](case-v3/BOM.md) |
 | Print the enclosure and controls | [Print settings and orientation](docs/printing.md) |
 | Build and use the Android app | [Android app](docs/android.md) |
 | Compile and flash the ESP32 | [Firmware](docs/firmware.md) |
