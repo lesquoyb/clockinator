@@ -12,7 +12,7 @@ The firmware is intended for a compatible ESP32 board connected to:
 - an I²S audio amplifier and speaker;
 - one or more NFC tags for the phone drop-off and morning checkpoints.
 
-[Wiring diagram](design/clockinator-wiring.svg) · [PNG version](design/clockinator-wiring.png)
+[Wiring diagram](design/clockinator-wiring.svg) · [PNG version](design/clockinator-wiring.svg)
 
 Pins defined by the firmware:
 
@@ -28,7 +28,7 @@ Pins defined by the firmware:
 
 Check the power requirements and exact pinout of your modules before wiring. The repository does not prescribe a specific ESP32 board or amplifier model.
 
-The v3 BOM models a 30-pin ESP32 WROOM board with USB-C, a MAX98357A amplifier
+The bill of materials models a 30-pin ESP32 WROOM board with USB-C, a MAX98357A amplifier
 and three Gateron KS-33 switches. Its mounting assumptions must be checked
 against the parts you actually buy.
 
@@ -49,7 +49,7 @@ connector through the opening before completing assembly.
 | RGB LED | Red GPIO13, green GPIO12, blue GPIO14; one series resistor per colour as listed in the BOM |
 
 The default firmware uses `LIGHT_COMMON_ANODE = false`. Match the LED's common
-connection and this constant to your actual LED. The physical light switch toggles the RGB light. The v3 BOM's
+connection and this constant to your actual LED. The physical light switch toggles the RGB light. The bill of materials's
 light-sensor module is not integrated into the
 enclosure or needed for the current light control.
 
@@ -70,17 +70,17 @@ This sequence has not yet been validated on a complete physical assembly.
 
 The current **v3 enclosure** has a removable lid, three low-profile keys, an e-paper window and a light diffuser. The [v3 bill of materials](../case-v3/BOM.md) lists electronics, fasteners and printable parts. [STL and CAD files](../case-v3/output/) include the shell, lid, switch plate, keys and diffuser variants. Fit, screw lengths, wiring and lighting still need validation on an assembled prototype.
 
-These are **CAD renders of the v3 design**, not photographs of an assembled device.
+These are **CAD renders of the enclosure**, not photographs of an assembled device.
 
 | Front-left | Front-right |
 | --- | --- |
-| ![Clockinator v3 enclosure, front-left CAD render](../case-v3/renders/front-left.png) | ![Clockinator v3 enclosure, front-right CAD render](../case-v3/renders/front-right.png) |
+| ![Clockinator enclosure, front-left CAD render](../case-v3/renders/front-left.png) | ![Clockinator enclosure, front-right CAD render](../case-v3/renders/front-right.png) |
 
 | Top and controls | Rear | Side |
 | --- | --- | --- |
-| ![Clockinator v3 top and three keys](../case-v3/renders/top.png) | ![Clockinator v3 rear CAD render](../case-v3/renders/rear.png) | ![Clockinator v3 side CAD render](../case-v3/renders/side.png) |
+| ![Clockinator top and three keys](../case-v3/renders/top.png) | ![Clockinator rear CAD render](../case-v3/renders/rear.png) | ![Clockinator side CAD render](../case-v3/renders/side.png) |
 
-The [v2 design files](../case-v2/output/) remain available for reference.
+The [earlier design files](../case-v2/output/) remain available for reference.
 
 The horizontal L-shaped dock combines a phone platform with space for a Qi driver and an NFC tag. These black renders show the dock without a phone; the underside has four recessed seats for adhesive rubber feet. The [dock guide](../case-dock/README.md) covers the latest scripts, STL files and measurements that still need checking.
 

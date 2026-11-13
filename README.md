@@ -2,7 +2,7 @@
 
 **A smart alarm clock synced with your phone, so you can leave your phone outside the bedroom.**
 
-**[Read the illustrated assembly manual and app tutorials (French)](https://lesquoyb.github.io/clockinator/)**
+**[Illustrated assembly manual and app tutorials](https://lesquoyb.github.io/clockinator/)** · [Manuel en français](https://lesquoyb.github.io/clockinator/fr/)
 
 Clockinator helps you put your phone down in the evening and get out of bed in the morning. Set your routines in the Android app, synchronize the clock, and leave your phone at its charging spot. The clock can ring in the bedroom while the phone stays elsewhere.
 
@@ -16,9 +16,9 @@ No account or cloud service is required. The app and clock communicate over Blue
 
 | Front | Rear |
 | --- | --- |
-| ![Clockinator v3, front-right CAD render](case-v3/renders/front-right.png) | ![Clockinator v3, rear CAD render](case-v3/renders/rear.png) |
+| ![Clockinator, front-right CAD render](case-v3/renders/front-right.png) | ![Clockinator, rear CAD render](case-v3/renders/rear.png) |
 
-The v3 enclosure combines a 3.7-inch e-paper display, a speaker, three keys and a light diffuser. A separate [phone dock](case-dock/README.md) can hold the phone, a Qi charging module and an NFC tag.
+The enclosure combines a 3.7-inch e-paper display, a speaker, three keys and a light diffuser. A separate [phone dock](case-dock/README.md) can hold the phone, a Qi charging module and an NFC tag.
 
 The Clockinator enclosure takes inspiration from the iPhone StandBy Mode Dock designed with OVERWERK, which in turn draws on Braun’s 1976 DN 40 electronic alarm clock by Dieter Rams and Dietrich Lubs. [iPhone StandBy Mode Dock on MakerWorld](https://makerworld.com/fr/models/615378-iphone-standby-mode-dock-designed-with-overwerk?from=search#profileId-538769) · [Braun design catalogue](https://assets.ctfassets.net/4m4ajbg1fhw2/2bT7ocvKzdTJOuLgFm88ca/c5265eca3453af67716293c7b8937c10/Braun-Products.pdf)
 
@@ -27,7 +27,7 @@ The Clockinator enclosure takes inspiration from the iPhone StandBy Mode Dock de
 | I want to… | Guide |
 | --- | --- |
 | Understand routines, NFC, synchronization and offline behaviour | [How it works](docs/how-it-works.md) |
-| Choose parts, wire and assemble the clock | [Illustrated assembly manual (French)](https://lesquoyb.github.io/clockinator/) and [v3 bill of materials](case-v3/BOM.md) |
+| Choose parts, wire and assemble the clock | [Illustrated assembly manual](https://lesquoyb.github.io/clockinator/) and [bill of materials](case-v3/BOM.md) |
 | Print the enclosure and controls | [Print settings and orientation](docs/printing.md) |
 | Build and use the Android app | [Android app](docs/android.md) |
 | Compile and flash the ESP32 | [Firmware](docs/firmware.md) |
@@ -37,8 +37,8 @@ The Clockinator enclosure takes inspiration from the iPhone StandBy Mode Dock de
 
 - [`android/alarm_controller/`](android/alarm_controller/): Android app, Kotlin and Jetpack Compose.
 - [`esp32/clockinator/`](esp32/clockinator/): ESP32 Arduino firmware.
-- [`case-v3/`](case-v3/): current enclosure, CAD scripts, renders and printable parts. See the [export status](case-v3/output/README.md) before using the native Fusion archive.
-- [`case-v2/`](case-v2/): earlier enclosure prototype.
+- [Enclosure files](case-v3/): current enclosure, CAD scripts, renders and printable parts. See the [export status](case-v3/output/README.md) before using the native Fusion archive.
+- [Earlier design files](case-v2/): earlier enclosure prototype.
 - [`case-dock/`](case-dock/): phone dock.
 
 The [UI design notes](docs/design/parcours-et-interface.md) and [interactive mockup](docs/design/prototype.html) document the interface direction implemented in the Android app. The HTML mockup uses sample data and is not an app screenshot.

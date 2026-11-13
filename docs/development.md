@@ -57,7 +57,7 @@ With CadQuery 2.7.0, run:
 python3 case-v3/fusion-work/export_plate_headless.py
 ```
 
-This rebuilds the current v3 plate, replaces it in the STEP and verifies the
+This rebuilds the current switch plate, replaces it in the STEP and verifies the
 exported geometry and STL. It checks the continuous rear rib and top skin,
 switch openings, mounting holes, mesh closure and print-bed height. The
 [export notes](../case-v3/output/README.md) distinguish these outputs from the

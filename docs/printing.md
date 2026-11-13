@@ -1,4 +1,4 @@
-# Printing the v3 enclosure
+# Printing the enclosure
 
 [Back to the project](../README.md) · [Build guide](build-guide.md) · [Parts list](../case-v3/BOM.md)
 
