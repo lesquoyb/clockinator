@@ -10,6 +10,8 @@ No account or cloud service is required. The app and clock communicate over Blue
 
 > **Work in progress.** The enclosure and electronics are prototypes; the complete hardware setup has not yet been validated. Images below are CAD renders, not photographs of an assembled product.
 
+[Manuel de montage et tutoriels (français)](https://lesquoyb.github.io/clockinator/) · [Sources du manuel](docs/index.html)
+
 ## The clock
 
 | Front | Rear |
