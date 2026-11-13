@@ -58,6 +58,7 @@ static void playTone(float frequency, int durationMs) {
         servicePhysicalControls();
         serviceAlarmVolume();
         serviceAudioTest();
+        serviceRingTimeout();
         if (!isRinging) {
             i2s_zero_dma_buffer(I2S_PORT);
             return;
@@ -212,6 +213,7 @@ bool playWavFile(const char* path) {
             serviceIncomingBluetooth();
             servicePhysicalControls();
             serviceAudioTest();
+        serviceRingTimeout();
             if (!isRinging) {
                 f.close();
                 i2s_zero_dma_buffer(I2S_PORT);

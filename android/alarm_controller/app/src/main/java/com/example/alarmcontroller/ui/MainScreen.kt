@@ -816,6 +816,7 @@ fun SettingsTab(
     onOpenDevice: () -> Unit,
     deviceSettings: Boolean = false
 ) {
+    val ringTimeoutMinutes by viewModel.ringTimeoutMinutes.collectAsState()
     val volumeLevel by viewModel.ringtoneVolumeLevel.collectAsState()
     val confirmedVolume by viewModel.confirmedVolumeLevel.collectAsState()
     val clockLightOn by viewModel.clockLightOn.collectAsState()
@@ -884,6 +885,27 @@ fun SettingsTab(
             ClockVolumeControl(volumeLevel, confirmedVolume, canSendToDevice, viewModel::setRingtoneVolume,
                 uploadedRingtones.sorted(), isVolumeTestPlaying,
                 viewModel::testClockRingtone, viewModel::stopClockRingtoneTest)
+        }
+
+        if (deviceSettings) SettingsSection(title = "Automatic stop") {
+            var minutesText by rememberSaveable(ringTimeoutMinutes) {
+                mutableStateOf(ringTimeoutMinutes.toString())
+            }
+            val minutes = minutesText.toIntOrNull()?.takeIf { it in 1..120 }
+            Text("Stops the clock after this much ringing. The setting is sent on the next sync if the clock is offline.")
+            OutlinedTextField(
+                value = minutesText,
+                onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minutesText = it },
+                label = { Text("Minutes (1–120)") },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(onClick = { minutes?.let(viewModel::setRingTimeoutMinutes) },
+                enabled = minutes != null && minutes != ringTimeoutMinutes) {
+                Text("Save duration")
+            }
         }
 
         var wifiSsid by rememberSaveable { mutableStateOf("") }

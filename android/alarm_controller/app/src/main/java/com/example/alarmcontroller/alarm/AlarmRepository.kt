@@ -153,6 +153,11 @@ class AlarmRepository(context: Context) {
 
     fun getAutoSyncHours(): Int = prefs.getInt(KEY_AUTO_SYNC_HOURS, DEFAULT_AUTO_SYNC_HOURS)
     fun backgroundSyncEnabled(): Boolean = prefs.getBoolean("background_sync", true)
+    fun ringTimeoutMinutes(): Int = prefs.getInt("ring_timeout_minutes", 20).coerceIn(1, 120)
+    fun setRingTimeoutMinutes(minutes: Int) {
+        require(minutes in 1..120)
+        prefs.edit().putInt("ring_timeout_minutes", minutes).apply()
+    }
     fun displayRefreshMinutes(): Int = prefs.getInt("display_refresh_minutes", 0).coerceIn(0, 1440)
     fun setDisplayRefreshMinutes(minutes: Int) { prefs.edit().putInt("display_refresh_minutes", minutes.coerceIn(0, 1440)).apply() }
     fun wifiSyncEnabled(): Boolean = prefs.getBoolean("wifi_sync", true)

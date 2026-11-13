@@ -100,7 +100,16 @@ object SyncPayload {
         return JSONObject().put("action", "SET_DISPLAY_REFRESH").put("minutes", minutes).toString()
     }
 
-    fun buildPushSyncJson(alarms: List<AlarmItem>, volumeLevel: Int = 3, displayRefreshMinutes: Int = 0): String {
+    fun buildSetRingTimeout(minutes: Int): String {
+        require(minutes in 1..120)
+        return JSONObject().put("action", "SET_RING_TIMEOUT").put("minutes", minutes).toString()
+    }
+
+    fun buildPushSyncJson(
+        alarms: List<AlarmItem>, volumeLevel: Int = 3, displayRefreshMinutes: Int = 0,
+        ringTimeoutMinutes: Int = 20
+    ): String {
+        require(ringTimeoutMinutes in 1..120)
         require(volumeLevel in 1..5)
         require(displayRefreshMinutes in 0..1440)
         val now = System.currentTimeMillis()
@@ -109,6 +118,7 @@ object SyncPayload {
             put("action", ACTION_SYNC)
             put("volumeLevel", volumeLevel)
             put("displayRefreshMinutes", displayRefreshMinutes)
+            put("ringTimeoutMinutes", ringTimeoutMinutes)
             put("timestamp", now / 1000)
             put("utcOffsetSec", tz.getOffset(now) / 1_000)
             val arr = JSONArray()

@@ -23,7 +23,7 @@
 #define RX_UUID      "12345678-1234-1234-1234-123456789abd"
 #define TX_UUID      "12345678-1234-1234-1234-123456789abe"
 
-static const char* DEVICE_NAME = "ESP32-Bapresearch";
+static const char* DEVICE_NAME = "Clockinator";
 
 BLECharacteristic* txCharacteristic;
 
@@ -302,10 +302,16 @@ void processIncomingCommand(String raw) {
             return;
         }
 
+        if (strcmp(action, "SET_RING_TIMEOUT") == 0) {
+            if (doc["minutes"].is<int>()) setRingTimeoutMinutes(doc["minutes"].as<int>());
+            return;
+        }
+
         /* ---- SYNC -------------------------------------------- */
         if (strcmp(action, A_SYNC) == 0 && doc.containsKey("alarms")) {
             if (doc["displayRefreshMinutes"].is<unsigned>())
                 setDisplayRefreshMinutes(doc["displayRefreshMinutes"].as<unsigned>());
+            if (doc["ringTimeoutMinutes"].is<int>()) setRingTimeoutMinutes(doc["ringTimeoutMinutes"].as<int>());
             if (doc["volumeLevel"].is<int>()) requestAlarmVolume(doc["volumeLevel"].as<int>());
             alarms.clear();
             for (JsonObject obj : doc["alarms"].as<JsonArray>())
@@ -366,10 +372,13 @@ void processIncomingCommand(String raw) {
         if (strcmp(action, A_PUSH_RINGTONE) == 0) {
             const char* alarmId = doc["alarmId"] | "";
             RingtoneType rt     = ringtoneFromWire(doc["ringtone"] | "");
+            if (rt == RT_UNKNOWN) rt = RT_WAKEUP;
+            // A duplicate push for an alarm already playing must not restart its timer.
+            if (isRinging && firingAlarmId == alarmId && firingRingtone == rt) return;
 
             /* Set firingAlarmId so the ringtone file can be looked up */
             firingAlarmId  = std::string(alarmId);
-            firingRingtone = (rt != RT_UNKNOWN) ? rt : RT_WAKEUP;
+            firingRingtone = rt;
             startRinging();
             return;
         }

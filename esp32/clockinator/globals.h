@@ -169,6 +169,8 @@ struct PendingCommand {
 /* clockinator.ino */
 void setNextAlarm();
 void startRinging();
+void setRingTimeoutMinutes(int minutes);
+void serviceRingTimeout();
 void stopAlarm();
 void snoozeAlarm(int minutes);
 void initPhysicalControls();

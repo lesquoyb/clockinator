@@ -89,6 +89,32 @@ static std::string snoozeCycleAlarmId;
 static RingtoneType snoozeCycleRingtone = RT_UNKNOWN;
 static size_t snoozeCycleIndex = 0;
 
+static constexpr int DEFAULT_RING_TIMEOUT_MINUTES = 20;
+static int ringTimeoutMinutes = DEFAULT_RING_TIMEOUT_MINUTES;
+static int savedRingTimeoutMinutes = DEFAULT_RING_TIMEOUT_MINUTES;
+static uint32_t ringStartedAt = 0;
+
+void setRingTimeoutMinutes(int minutes) {
+    if (minutes < 1 || minutes > 120) return;
+    ringTimeoutMinutes = minutes;
+    if (minutes == savedRingTimeoutMinutes) return;
+    Preferences prefs;
+    if (prefs.begin("clock-alarm", false)) {
+        if (prefs.putInt("timeout-min", minutes) == sizeof(int32_t))
+            savedRingTimeoutMinutes = minutes;
+        prefs.end();
+    }
+    if (minutes != savedRingTimeoutMinutes) Serial.println("Could not persist alarm ring timeout");
+}
+
+void serviceRingTimeout() {
+    // The audio preview has its own five-second timeout and uses RT_UNKNOWN.
+    if (isRinging && firingRingtone != RT_UNKNOWN &&
+        uint32_t(millis() - ringStartedAt) >= uint32_t(ringTimeoutMinutes) * 60000U) {
+        stopAlarm();
+    }
+}
+
 bool hasPendingSnooze() { return snoozedUntil > 0 && !snoozedAlarmId.empty(); }
 
 bool selectAlarmControlTarget(const char* id, RingtoneType type) {
@@ -190,6 +216,7 @@ void startRinging() {
     } else {
         activeRingtoneFile = "";
     }
+    ringStartedAt = millis();
     isRinging = true;
 }
 
@@ -489,6 +516,15 @@ void setup() {
     cmdQueue = xQueueCreate(8, sizeof(PendingCommand));
     wifiConfigQueue = xQueueCreate(1, sizeof(WifiCredentials));
 
+    Preferences alarmPrefs;
+    if (alarmPrefs.begin("clock-alarm", true)) {
+        const int savedMinutes = alarmPrefs.getInt("timeout-min", DEFAULT_RING_TIMEOUT_MINUTES);
+        if (savedMinutes >= 1 && savedMinutes <= 120) {
+            ringTimeoutMinutes = savedMinutes;
+            savedRingTimeoutMinutes = savedMinutes;
+        }
+        alarmPrefs.end();
+    }
     initAlarmVolume();
     initAudioTest();
     setupI2S();
@@ -512,6 +548,7 @@ void loop() {
     serviceWifi();
     serviceAlarmVolume();
     serviceAudioTest();
+    serviceRingTimeout();
     refreshVolumeDisplay();
     serviceClockRefresh();
 

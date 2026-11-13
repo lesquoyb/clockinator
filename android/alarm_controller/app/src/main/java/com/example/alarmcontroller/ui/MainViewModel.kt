@@ -143,6 +143,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _autoSyncHours = MutableStateFlow(alarmRepository.getAutoSyncHours())
     val autoSyncHours: StateFlow<Int> = _autoSyncHours.asStateFlow()
     val backgroundSyncEnabled = MutableStateFlow(alarmRepository.backgroundSyncEnabled())
+    private val _ringTimeoutMinutes = MutableStateFlow(alarmRepository.ringTimeoutMinutes())
+    val ringTimeoutMinutes = _ringTimeoutMinutes.asStateFlow()
+
+    fun setRingTimeoutMinutes(minutes: Int) {
+        alarmRepository.setRingTimeoutMinutes(minutes)
+        _ringTimeoutMinutes.value = minutes
+        if (isDeviceConnected()) viewModelScope.launch {
+            val result = sendToDevice(SyncPayload.buildSetRingTimeout(minutes))
+            if (result.isFailure) _statusAlert.value = "Automatic stop saved; it will apply on the next sync."
+        }
+    }
+
     val displayRefreshMinutes = MutableStateFlow(alarmRepository.displayRefreshMinutes())
     fun setDisplayRefreshMinutes(minutes: Int) {
         require(minutes in 0..1440)
@@ -215,7 +227,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         loadAlarms()
         _ringtoneVolumeLevel.value = alarmRepository.getRingtoneVolume()
-        val sent = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value, alarmRepository.displayRefreshMinutes())).isSuccess
+        val sent = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value, alarmRepository.displayRefreshMinutes(), alarmRepository.ringTimeoutMinutes())).isSuccess
         _hasPendingSync.value = !sent
         if (sent) lastSyncSent.value = android.os.SystemClock.elapsedRealtimeNanos()
         return sent
@@ -573,7 +585,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             loadAlarms()
-            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value, displayRefreshMinutes.value))
+            val result = sendToDevice(SyncPayload.buildPushSyncJson(_alarms.value, _ringtoneVolumeLevel.value, displayRefreshMinutes.value, _ringTimeoutMinutes.value))
             if (result.isSuccess) {
                 _hasPendingSync.value = false
                 lastSyncSent.value = android.os.SystemClock.elapsedRealtimeNanos()
