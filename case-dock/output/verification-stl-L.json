@@ -1,10 +1,10 @@
 [
   {
     "file": "dock-L-body.stl",
-    "triangles": 5368,
+    "triangles": 5352,
     "watertight": true,
-    "volume_mm3": 48109.5819,
-    "cad_volume_mm3": 48146.4182,
+    "volume_mm3": 48121.1258,
+    "cad_volume_mm3": 48157.9622,
     "bounds_mm": [
       [
         -45.0,

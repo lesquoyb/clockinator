@@ -17,6 +17,8 @@ The current version is the **horizontal L-shaped dock**, Fusion document `phone 
 
 Latest parts: [body STL](output/dock-L-body.stl), [bottom-cover STL](output/dock-L-bottom-cover.stl), [Fusion assembly](output/dock-L-assembly.f3d), [STEP parts](output/dock-L-parts.step). STL dimensions are in millimetres and retain the original model coordinates: X across the dock, Y upwards, Z along the phone. Orient the parts and inspect support requirements in the slicer before printing.
 
+The two rear M3 mounts are shifted 1.5 mm toward the interior, to Z = −24 mm. Their nut slots clear the rear cavity wall by 0.7 mm. The matching cover holes move with them, so print the updated body and cover together. The rear columns stop short of the PCB guide. CAD checks confirm the nut insertion paths and the loaded cover's clearance during insertion; physical fit still requires a print test.
+
 To reproduce, run the build script in a new Fusion design, then run the export script in a separate script invocation after the model is committed. To export a manually edited version, open that version and run only the export script. Run the mesh verifier with `python case-dock/fusion-work/verify_dock_exports.py` from the repository root.
 
 ### Rubber feet

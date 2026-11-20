@@ -18,6 +18,22 @@ def run(_context: str):
             pockets.append([round(g.origin.x*10,3),round(g.origin.z*10,3)])
     assert sorted(pockets)==[[-33.,-14.],[-33.,146.],[33.,-14.],[33.,146.]],pockets
     assert all(b.isSolid and b.lumps.count==1 for b in [body,cover])
+    # Check an M3 nut's full lateral insertion path at both rear mounts.
+    mgr=adsk.fusion.TemporaryBRepManager.get()
+    for sx in (-1,1):
+        corridor=mgr.createBox(adsk.core.OrientedBoundingBox3D.create(
+            adsk.core.Point3D.create(sx*1.84,.28,-2.4),
+            adsk.core.Vector3D.create(1,0,0),
+            adsk.core.Vector3D.create(0,1,0),3.68,.24,.56))
+        assert mgr.booleanOperation(corridor,mgr.copy(body),adsk.fusion.BooleanTypes.IntersectionBooleanType)
+        assert not corridor.faces.count or abs(corridor.volume)<1e-7,'Rear nut insertion blocked'
+    for part in (body,cover):
+        holes=set()
+        for face in part.faces:
+            g=face.geometry
+            if g.surfaceType==adsk.core.SurfaceTypes.CylinderSurfaceType and abs(g.radius-.17)<1e-6 and abs(g.axis.y)>.99:
+                holes.add((round(g.origin.x*10,3),round(g.origin.z*10,3)))
+        assert holes=={(x,z) for x in (-34.,34.) for z in (-24.,8.,160.)},holes
     directory=r'C:\Users\baptiste\Documents\GitHub\clockinator\case-dock\output'
     os.makedirs(directory,exist_ok=True)
     exp=design.exportManager
@@ -33,6 +49,7 @@ def run(_context: str):
     assert exp.execute(exp.createSTEPExportOptions(os.path.join(directory,'dock-L-parts.step'),component))
     report={'document':app.activeDocument.name,'pad_pockets':{'body':'Bottom cover','diameter_mm':8.4,'depth_mm':1,'foot_height_mm':2,'protrusion_mm':1,'remaining_cover_mm':.8,'centers_xz_mm':sorted(pockets)},'parts':[{'name':b.name,'volume_cm3':b.volume,'solid':b.isSolid,'lumps':b.lumps.count} for b in [body,cover]]}
     report['fillet_clearance_envelope_mm']=1.2
+    report['rear_nut_mounts']={'centers_xz_mm':[[-34,-24],[34,-24]],'inward_shift_mm':1.5,'rear_wall_clearance_mm':.7,'insertion_path_clear':True}
     pcb=next(b for o in design.rootComponent.occurrences if o.component.name=='Dock - references'
              for b in o.component.bRepBodies if b.name.startswith('Qi driver PCB 41x20'))
     bounds=pcb.boundingBox

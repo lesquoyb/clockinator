@@ -106,11 +106,14 @@ def run(_context: str):
     boolean(shell, cav, cut)
 
     # ----- cover screws: columns on the side walls, nut slides in from the cavity -----
-    screws = [(sx * 34.0, z) for sx in (-1, 1) for z in (-25.5, 8.0, 160.0)]
+    # Rear nut slots need 0.7 mm clearance from the inner rear wall.
+    # Keep their columns clear of the PCB guide despite moving the axes inward.
+    screws = [(sx * 34.0, z) for sx in (-1, 1) for z in (-24.0, 8.0, 160.0)]
     for x, z in screws:
         sx = 1 if x > 0 else -1
         xa, xb = sorted((sx * 29.8, sx * 43.0))
-        blk = box(xa, xb, 0, 8, z - 4.2, z + 4.2)
+        column_front = -21.3 if z == -24.0 else z + 4.2
+        blk = box(xa, xb, 0, 8, z - 4.2, column_front)
         boolean(blk, mgr.copy(env), intersect)
         boolean(shell, blk, union)
         boolean(shell, cylinder(x, -1, z, x, 6, z, 1.7), cut)

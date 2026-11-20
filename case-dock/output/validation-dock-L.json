@@ -1,5 +1,5 @@
 {
-  "document": "phone dock - L",
+  "document": "Phone dock L - rear nut clearance",
   "pad_pockets": {
     "body": "Bottom cover",
     "diameter_mm": 8.4,
@@ -29,18 +29,33 @@
   "parts": [
     {
       "name": "Dock body",
-      "volume_cm3": 48.14641817184351,
+      "volume_cm3": 48.157962171843494,
       "solid": true,
       "lumps": 1
     },
     {
       "name": "Bottom cover",
-      "volume_cm3": 32.724166217460194,
+      "volume_cm3": 32.72416621746019,
       "solid": true,
       "lumps": 1
     }
   ],
   "fillet_clearance_envelope_mm": 1.2,
+  "rear_nut_mounts": {
+    "centers_xz_mm": [
+      [
+        -34,
+        -24
+      ],
+      [
+        34,
+        -24
+      ]
+    ],
+    "inward_shift_mm": 1.5,
+    "rear_wall_clearance_mm": 0.7,
+    "insertion_path_clear": true
+  },
   "pcb_tray": {
     "bare_board_mm": [
       41,
@@ -52,7 +67,5 @@
     "inner_stop_mm": 3,
     "outer_stop_mm": 5,
     "wire_opening_mm": 13
-  },
-  "generator_reproduces_live_parts": true,
-  "generator_volume_tolerance_cm3": 1e-07
+  }
 }
