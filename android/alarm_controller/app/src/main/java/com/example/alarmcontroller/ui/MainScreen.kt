@@ -62,6 +62,7 @@ fun MainScreen(
     val connectionState  by viewModel.connectionState.collectAsState()
     val wifiConnectionState by viewModel.wifiConnectionState.collectAsState()
     val alarms           by viewModel.alarms.collectAsState()
+    val homeLightOn by viewModel.clockLightOn.collectAsState()
     val hasPendingSync   by viewModel.hasPendingSync.collectAsState()
     val isPhoneRinging   by viewModel.isPhoneAlarmRinging.collectAsState()
     val ringingTitle     by viewModel.ringingAlarmTitle.collectAsState()
@@ -258,7 +259,7 @@ fun MainScreen(
                                 }
                             }
                         }
-                    })
+                    }, lightOn = homeLightOn, onLightChange = viewModel::setClockLight)
                 "routines" -> {
                     AlarmsTab(
                         alarms = alarms,
@@ -821,9 +822,6 @@ fun SettingsTab(
     val confirmedVolume by viewModel.confirmedVolumeLevel.collectAsState()
     val clockLightOn by viewModel.clockLightOn.collectAsState()
     val clockLightColor by viewModel.clockLightColor.collectAsState()
-    var lightRed by rememberSaveable(clockLightColor) { mutableStateOf(clockLightColor?.get(0)?.toString() ?: "255") }
-    var lightGreen by rememberSaveable(clockLightColor) { mutableStateOf(clockLightColor?.get(1)?.toString() ?: "255") }
-    var lightBlue by rememberSaveable(clockLightColor) { mutableStateOf(clockLightColor?.get(2)?.toString() ?: "255") }
     val isVolumeTestPlaying by viewModel.isVolumeTestPlaying.collectAsState()
     val lastEspWifiIp by viewModel.lastEspWifiIp.collectAsState()
     val autoSyncHours     by viewModel.autoSyncHours.collectAsState()
@@ -1087,34 +1085,8 @@ fun SettingsTab(
                         }, label = { Text(label) })
                 }
             }
-            var customColor by rememberSaveable { mutableStateOf(false) }
-            TextButton(onClick = { customColor = !customColor }) { Text(if (customColor) "Hide custom colour" else "Custom colour") }
-            if (customColor) {
-                Text("RGB values: 0–255 per channel.", style = MaterialTheme.typography.bodySmall)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(Triple("Red", lightRed, { value: String -> lightRed = value }),
-                        Triple("Green", lightGreen, { value: String -> lightGreen = value }),
-                        Triple("Blue", lightBlue, { value: String -> lightBlue = value })).forEach { (label, value, update) ->
-                        OutlinedTextField(value = value, onValueChange = update,
-                            label = { Text(label) }, modifier = Modifier.weight(1f), singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                            isError = value.toIntOrNull()?.let { it !in 0..255 } ?: true,
-                            enabled = canSendToDevice && clockLightColor != null)
-                    }
-                }
-                val rgb = listOf(lightRed, lightGreen, lightBlue).map { it.toIntOrNull() }
-                OutlinedButton(onClick = {
-                    val red = lightRed.toIntOrNull()
-                    val green = lightGreen.toIntOrNull()
-                    val blue = lightBlue.toIntOrNull()
-                    if (red != null && green != null && blue != null)
-                        viewModel.setClockLightColor(red, green, blue)
-                }, enabled = canSendToDevice && clockLightColor != null && rgb.all { it != null && it in 0..255 },
-                    modifier = Modifier.fillMaxWidth()) {
-                    Text("Apply RGB")
-                }
-            }
+            LightColorPicker(rgb = clockLightColor, enabled = canSendToDevice && clockLightColor != null,
+                onApply = { r, g, b -> viewModel.setClockLightColor(r, g, b) })
         }
         if (deviceSettings) SettingsSection(title = "Clock screen") {
             OutlinedButton(onClick = viewModel::refreshClockDisplay, enabled = canSendToDevice,

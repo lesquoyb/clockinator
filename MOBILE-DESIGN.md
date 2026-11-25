@@ -34,6 +34,17 @@ The old Alarms/Device/Settings tab row is removed. Device diagnostics, NFC, Focu
 
 ## Screen Direction
 
+- **Calendar routines:** retain daily, selected weekdays and anchored intervals;
+  add a native date picker for one-off routines. The selected one-off date is
+  the wake-up date; evening slots later than wake-up belong to the previous day.
+  Expired one-off events disappear from the agenda and are not rescheduled.
+  Weekly/interval semantics remain unchanged for existing routines.
+- **Lamp:** each routine slot has Unchanged / On / Off. Home offers a confirmed-state
+  switch, disabled while disconnected or awaiting state. Clock settings use an
+  HSV colour plane, accessible hue/saturation sliders and an intensity slider.
+  Apply sends a single command rather than flooding the radio during dragging.
+  Existing Material tokens, navigation and dials (5/3/4) are retained.
+
 - **Setup:** connect the single alarm clock, then create the first wake-up. Setup can be deferred without blocking daily use.
 - **Dashboard:** show connection/sync status, each routine's active state, Focus time/output, optional Bedtime time/output, and Wake-up time/output. The primary actions are toggle, skip/undo next wake-up, edit, and add. Empty and ringing states have direct actions.
 - **Device:** secondary diagnostics with reconnection, scan, remote control, and activity console.

@@ -122,7 +122,10 @@ static Recurrence parseRecurrence(JsonObject rec) {
     if (rec.isNull()) { r.type = REC_DAILY; return r; }
 
     const char* t = rec["type"] | "daily";
-    if (strcmp(t, "weekly") == 0) {
+    if (strcmp(t, "once") == 0) {
+        r.type = REC_ONCE;
+        r.anchorEpochDay = rec["epochDay"] | -1L;
+    } else if (strcmp(t, "weekly") == 0) {
         r.type = REC_WEEKLY;
         std::string ds(rec["days"] | "");
         std::string tok;
@@ -167,6 +170,9 @@ static RingtoneSlot parseSlot(JsonObject obj, RingtoneType type) {
             s.ringOnDevice = true;
             break;
     }
+    s.lightAction = obj["lightAction"] | -1;
+    if (s.lightAction < -1 || s.lightAction > 1) s.lightAction = -1;
+    s.epochDay = obj["epochDay"] | -1L;
     s.enabled      = true; // disabled slots are not transmitted
     return s;
 }

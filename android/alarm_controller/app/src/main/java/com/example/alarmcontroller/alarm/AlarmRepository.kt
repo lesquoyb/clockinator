@@ -119,9 +119,10 @@ class AlarmRepository(context: Context) {
      */
     fun findUpcomingSlot(type: RingtoneType): AlarmItem? {
         val now = System.currentTimeMillis()
-        return getAlarms().filter { it.isEnabled && it.slot(type).enabled }.minByOrNull { alarm ->
+        return getAlarms().filter { it.isEnabled && it.slot(type).enabled &&
+            it.recurrenceFor(type).nextOccurrenceTime(it.slot(type).hour, it.slot(type).minute, now) != Long.MAX_VALUE }.minByOrNull { alarm ->
             val slot  = alarm.slot(type)
-            alarm.recurrence.nextOccurrenceTime(slot.hour, slot.minute, now)
+            alarm.recurrenceFor(type).nextOccurrenceTime(slot.hour, slot.minute, now)
         }
     }
 

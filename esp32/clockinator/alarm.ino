@@ -11,6 +11,10 @@
  * shows <hour:minute>, respecting the recurrence rule.
  * -------------------------------------------------------------------------*/
 time_t Recurrence::nextOccurrence(time_t from_time, int hour, int minute) const {
+    if (type == REC_ONCE) {
+        const time_t target = (time_t)anchorEpochDay * 86400 + hour * 3600 + minute * 60;
+        return anchorEpochDay >= 0 && target > from_time ? target : 0;
+    }
     struct tm t;
     localtime_r(&from_time, &t);
     t.tm_hour = hour;
@@ -29,6 +33,7 @@ time_t Recurrence::nextOccurrence(time_t from_time, int hour, int minute) const 
     }
 
     switch (type) {
+        case REC_ONCE: return 0;
         case REC_DAILY:
             return candidate;
 
@@ -66,7 +71,9 @@ void Alarm::setDismissed(RingtoneType t, bool v) {
         dismissedMask |= (1u << t);
         const RingtoneSlot& s = slot(t);
         time_t now = start_time + (time_t)(millis() / 1000);
-        dismissedUntil[t] = recurrence.nextOccurrence(now, s.hour, s.minute);
+        Recurrence rule = recurrence;
+        if (rule.type == REC_ONCE && s.epochDay >= 0) rule.anchorEpochDay = s.epochDay;
+        dismissedUntil[t] = rule.nextOccurrence(now, s.hour, s.minute);
     } else {
         dismissedMask &= ~(1u << t);
         dismissedUntil[t] = 0;
@@ -88,10 +95,12 @@ time_t Alarm::nextTrigger(time_t now, RingtoneType t) const {
 
     if (!s.enabled)      return 0;   /* bedtime disabled */
     if (!s.ringOnDevice) return 0;   /* this device should not ring for this slot */
+    Recurrence rule = recurrence;
+    if (rule.type == REC_ONCE && s.epochDay >= 0) rule.anchorEpochDay = s.epochDay;
     if (isDismissed(t) && dismissedUntil[t] > now)
-        return recurrence.nextOccurrence(dismissedUntil[t], s.hour, s.minute);
+        return rule.nextOccurrence(dismissedUntil[t], s.hour, s.minute);
 
-    return recurrence.nextOccurrence(now, s.hour, s.minute);
+    return rule.nextOccurrence(now, s.hour, s.minute);
 }
 
 /* -------------------------------------------------------------------------

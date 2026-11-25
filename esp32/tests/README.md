@@ -20,6 +20,11 @@ Arduino dependencies. They verify daily, weekly, interval and one-time skip
 scheduling. They do not validate BLE, TCP, JSON parsing, audio, display drivers
 or the full Arduino sketch; those still require an ESP32 toolchain and hardware.
 
+`routine_light_test.cpp` exercises `RoutineLightScheduler.h` with `alarm.ino`:
+dated evening actions, sound disabled on the clock, duplicate-loop suppression,
+no repeat on the following day, skipped events and paused routines. Compile
+with the same include path as `alarm_test.cpp`.
+
 `controls_test.cpp` exercises the real PCM scaling and switch debounce helpers:
 all five non-mute levels, full-scale signed samples, invalid level clamping,
 contact bounce, press/release edges, held keys and `millis()` wraparound.

@@ -160,6 +160,12 @@ void cyclePhysicalSnooze() {
  * Does NOT call drawClock(): the caller is responsible for refreshing the
  * display at the right time to avoid cross-core SPI access.
  * -------------------------------------------------------------------------*/
+#include "RoutineLightScheduler.h"
+static RoutineLightScheduler routineLightScheduler;
+static void serviceRoutineLights(time_t now) {
+    routineLightScheduler.service(alarms, now, [](bool enabled) { setClockLight(enabled); });
+}
+
 void setNextAlarm() {
     time_t now      = start_time + (time_t)(millis() / 1000);
     time_t earliest = 0;
@@ -558,6 +564,8 @@ void loop() {
     if (now / 60 != lastClockMinute) {
         drawClock();
     }
+
+    serviceRoutineLights(now);
 
     // A scheduled alarm takes priority over a volume preview.
     if (next_alarm > 0 && now >= next_alarm) cancelAudioTest();

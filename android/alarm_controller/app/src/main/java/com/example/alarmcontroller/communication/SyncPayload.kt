@@ -129,13 +129,22 @@ object SyncPayload {
                     put("snoozeDurations", JSONArray(alarm.snoozeDurations))
                     put("recurrence", alarm.recurrence.toJson())
                     if (alarm.lockPhone.enabled){
-                        put("lock", alarm.lockPhone.toJson(RingtoneType.LOCK_PHONE))
+                        put("lock", alarm.lockPhone.toJson(RingtoneType.LOCK_PHONE).apply {
+                            val rule = alarm.recurrenceFor(RingtoneType.LOCK_PHONE)
+                            if (rule is com.example.alarmcontroller.alarm.Recurrence.Once) put("epochDay", rule.epochDay)
+                        })
                     }
                     if (alarm.bedtime.enabled) {
-                        put("bed", alarm.bedtime.toJson(RingtoneType.BEDTIME))
+                        put("bed", alarm.bedtime.toJson(RingtoneType.BEDTIME).apply {
+                            val rule = alarm.recurrenceFor(RingtoneType.BEDTIME)
+                            if (rule is com.example.alarmcontroller.alarm.Recurrence.Once) put("epochDay", rule.epochDay)
+                        })
                     }
                     if (alarm.wakeup.enabled) {
-                        put("wake", alarm.wakeup.toJson(RingtoneType.WAKEUP))
+                        put("wake", alarm.wakeup.toJson(RingtoneType.WAKEUP).apply {
+                            val rule = alarm.recurrenceFor(RingtoneType.WAKEUP)
+                            if (rule is com.example.alarmcontroller.alarm.Recurrence.Once) put("epochDay", rule.epochDay)
+                        })
                     }
                     if (alarm.ringtoneFile != null) put("file", alarm.ringtoneFile)
                     // Dismissed set so ESP skips the right slots even without a full resync

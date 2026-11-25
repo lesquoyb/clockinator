@@ -49,6 +49,19 @@ int main() {
     assert(interval.nextOccurrence(at(9, 8), 7, 0) == at(10, 7));
     assert(interval.nextOccurrence(at(7, 7), 22, 0) == at(7, 22));
 
+    Recurrence once;
+    once.type = REC_ONCE;
+    once.anchorEpochDay = (long)(at(7, 0) / 86400);
+    assert(once.nextOccurrence(at(6, 22), 7, 0) == at(7, 7));
+    assert(once.nextOccurrence(at(7, 7), 7, 0) == 0);
+    assert(once.nextOccurrence(at(8, 6), 7, 0) == 0);
+    Alarm dated;
+    dated.recurrence = once;
+    dated.lockPhone.hour = 22;
+    dated.lockPhone.epochDay = once.anchorEpochDay - 1;
+    assert(dated.nextTrigger(at(6, 20), RT_LOCK_PHONE) == at(6, 22));
+    assert(dated.nextTrigger(at(7, 6), RT_LOCK_PHONE) == 0);
+
     Alarm alarm;
     alarm.wakeup.hour = 7;
     start_time = at(7, 6);
@@ -63,5 +76,5 @@ int main() {
     alarm.wakeup.enabled = true;
     alarm.wakeup.ringOnDevice = false;
     assert(alarm.nextTrigger(start_time, RT_WAKEUP) == 0);
-    std::cout << "12 firmware scheduling assertions passed\n";
+    std::cout << "Firmware scheduling assertions passed (including dated routines)\n";
 }

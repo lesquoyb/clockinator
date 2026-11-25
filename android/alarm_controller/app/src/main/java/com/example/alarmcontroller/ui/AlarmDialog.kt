@@ -87,12 +87,18 @@ fun AlarmDialog(
     var recMode by rememberSaveable {
         mutableStateOf(
             when (initialAlarm?.recurrence) {
+                is Recurrence.Once -> "once"
                 is Recurrence.Weekly    -> "weekly"
                 is Recurrence.EveryDays -> "interval"
                 else                    -> "daily"
             }
         )
     }
+    var onceDay by rememberSaveable { mutableLongStateOf(
+        (initialAlarm?.recurrence as? Recurrence.Once)?.epochDay ?: java.time.LocalDate.now().plusDays(1).toEpochDay()) }
+    var lpLight by rememberSaveable { mutableIntStateOf(initialAlarm?.lockPhone?.lightAction ?: -1) }
+    var btLight by rememberSaveable { mutableIntStateOf(initialAlarm?.bedtime?.lightAction ?: -1) }
+    var wuLight by rememberSaveable { mutableIntStateOf(initialAlarm?.wakeup?.lightAction ?: -1) }
     var selectedDays by rememberSaveable {
         mutableStateOf(
             (initialAlarm?.recurrence as? Recurrence.Weekly)?.days ?: setOf(1, 2, 3, 4, 5)
@@ -121,7 +127,7 @@ fun AlarmDialog(
 
     fun snapshot() = listOf(title, lpHour, lpMin, lpDevice, btEnabled, btHour, btMin,
         btPhone, btDevice, wuHour, wuMin, wuPhone, recMode, selectedDays.sorted(),
-        intervalText, snoozeDurations.toList(), ringtoneFile).toString()
+        intervalText, onceDay, lpLight, btLight, wuLight, snoozeDurations.toList(), ringtoneFile).toString()
     val initialSnapshot = rememberSaveable(initialAlarm?.id) { snapshot() }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     fun requestClose() {
@@ -223,17 +229,28 @@ fun AlarmDialog(
 
                 SectionLabel("Repeats")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf("daily", "weekly", "interval")) { mode ->
+                    items(listOf("daily", "weekly", "once", "interval")) { mode ->
                         FilterChip(
                             selected = recMode == mode,
                             onClick = { recMode = mode },
                             label = { Text(when (mode) {
                                 "daily" -> "Daily"
                                 "weekly" -> "Weekly"
+                                "once" -> "One date"
                                 else -> "Every N days"
                             }) }
                         )
                     }
+                }
+                if (recMode == "once") {
+                    val context = LocalContext.current
+                    OutlinedButton(onClick = {
+                        val date = java.time.LocalDate.ofEpochDay(onceDay)
+                        android.app.DatePickerDialog(context, { _, y, m, d ->
+                            onceDay = java.time.LocalDate.of(y, m + 1, d).toEpochDay()
+                        }, date.year, date.monthValue - 1, date.dayOfMonth).show()
+                    }) { Text("Wake-up date: ${java.time.LocalDate.ofEpochDay(onceDay)}") }
+                    Text("Evening events later than the wake-up time take place the day before.", style = MaterialTheme.typography.bodySmall)
                 }
                 if (recMode == "weekly") {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -258,6 +275,11 @@ fun AlarmDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+
+                SectionLabel("Automatic light")
+                LightActionChoice("Focus", lpLight) { lpLight = it }
+                if (btEnabled) LightActionChoice("Bedtime", btLight) { btLight = it }
+                LightActionChoice("Wake-up", wuLight) { wuLight = it }
 
                 Surface(
                     onClick = { showNightOptions = !showNightOptions },
@@ -337,6 +359,7 @@ fun AlarmDialog(
                 TextButton(onClick = { requestClose() }) { Text("Cancel") }
                 Button(onClick = {
                     val recurrence = when (recMode) {
+                        "once" -> Recurrence.Once(onceDay)
                         "weekly" -> {
                             if (selectedDays.isEmpty()) { errorMsg = "Select at least one day."; return@Button }
                             Recurrence.Weekly(selectedDays)
@@ -352,20 +375,25 @@ fun AlarmDialog(
                         else -> Recurrence.Daily
                     }
 
+                    if (recurrence is Recurrence.Once &&
+                        recurrence.nextOccurrenceTime(wuHour, wuMin, System.currentTimeMillis()) == Long.MAX_VALUE) {
+                        errorMsg = "Choose a wake-up date and time in the future."
+                        return@Button
+                    }
                     val finalDurations = snoozeDurations.sorted().ifEmpty { AlarmItem.DEFAULT_SNOOZE_DURATIONS }
                     val finalRingtoneFile = ringtoneFile.trim().ifEmpty { null }
 
                     onSave(
                         title.ifBlank { "Routine" },
-                        RingtoneSlot(lpHour, lpMin, ringOnPhone = lpPhone, ringOnDevice = lpDevice),
+                        RingtoneSlot(lpHour, lpMin, ringOnPhone = lpPhone, ringOnDevice = lpDevice, lightAction = lpLight),
                         RingtoneSlot(
                             if (btEnabled) btHour else lpHour,
                             if (btEnabled) btMin else lpMin,
                             ringOnPhone = btPhone,
                             ringOnDevice = btDevice,
-                            enabled = btEnabled
+                            enabled = btEnabled, lightAction = btLight
                         ),
-                        RingtoneSlot(wuHour, wuMin, ringOnPhone = wuPhone, ringOnDevice = wuDevice),
+                        RingtoneSlot(wuHour, wuMin, ringOnPhone = wuPhone, ringOnDevice = wuDevice, lightAction = wuLight),
                         recurrence,
                         finalDurations,
                         finalRingtoneFile
@@ -487,4 +515,14 @@ private fun SoundOutputControl(
 @Composable
 private fun SectionLabel(text: String) {
     Text(text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+}
+
+@Composable
+private fun LightActionChoice(label: String, action: Int, onChange: (Int) -> Unit) {
+    Text(label, style = MaterialTheme.typography.labelLarge)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(-1 to "Unchanged", 1 to "On", 0 to "Off").forEach { (value, text) ->
+            FilterChip(selected = action == value, onClick = { onChange(value) }, label = { Text(text) })
+        }
+    }
 }

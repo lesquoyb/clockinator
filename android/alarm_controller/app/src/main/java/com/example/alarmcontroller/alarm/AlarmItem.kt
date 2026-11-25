@@ -63,7 +63,8 @@ data class RingtoneSlot(
     val minute: Int,
     val ringOnPhone: Boolean  = true,
     val ringOnDevice: Boolean = true,
-    val enabled: Boolean      = true
+    val enabled: Boolean      = true,
+    val lightAction: Int = -1 // -1 unchanged, 0 off, 1 on
 ) {
     val formatted: String
         get() = String.format(Locale.getDefault(), "%02d:%02d", hour, minute)
@@ -78,11 +79,13 @@ data class RingtoneSlot(
         put("ringPhone", ringOnPhone)
         put("ringDevice", ringOnDevice)
         put("enabled", enabled)
+        put("lightAction", lightAction)
     }
 
     fun toWireJson(type: RingtoneType): JSONObject = JSONObject().apply {
         put("h", hour)
         put("m", minute)
+        put("lightAction", lightAction)
         if (type == RingtoneType.LOCK_PHONE || type == RingtoneType.BEDTIME) {
             put("ringDevice", ringOnDevice)
         }
@@ -99,7 +102,8 @@ data class RingtoneSlot(
             minute       = if (json.has("minute")) json.optInt("minute", 0) else json.optInt("m", 0),
             ringOnPhone  = if (json.has("ringOnPhone")) json.optBoolean("ringOnPhone", true) else json.optBoolean("ringPhone", true),
             ringOnDevice = if (json.has("ringOnDevice")) json.optBoolean("ringOnDevice", true) else json.optBoolean("ringDevice", true),
-            enabled      = json.optBoolean("enabled", true)
+            enabled      = json.optBoolean("enabled", true),
+            lightAction = json.optInt("lightAction", -1).takeIf { it in -1..1 } ?: -1
         )
     }
 }
@@ -171,6 +175,15 @@ data class AlarmItem(
         )
     }
 
+    // A dated routine is anchored to its wake-up date; evening slots are on the previous day.
+    fun recurrenceFor(type: RingtoneType): Recurrence {
+        val rule = recurrence
+        if (rule !is Recurrence.Once || type == RingtoneType.WAKEUP) return rule
+        val event = slot(type)
+        return if (event.hour * 60 + event.minute > wakeup.hour * 60 + wakeup.minute)
+            Recurrence.Once(rule.epochDay - 1) else rule
+    }
+
     fun nextRingtoneType(nowMillis: Long = System.currentTimeMillis()): RingtoneType? {
         if (!isEnabled) return null
 
@@ -180,9 +193,12 @@ data class AlarmItem(
             if (!isDismissed(RingtoneType.WAKEUP)) add(RingtoneType.WAKEUP)
         }
 
-        return candidates.minByOrNull { type ->
+        return candidates.filter { type ->
+            val event = slot(type)
+            recurrenceFor(type).nextOccurrenceTime(event.hour, event.minute, nowMillis) != Long.MAX_VALUE
+        }.minByOrNull { type ->
             val slot = slot(type)
-            recurrence.nextOccurrenceTime(slot.hour, slot.minute, nowMillis)
+            recurrenceFor(type).nextOccurrenceTime(slot.hour, slot.minute, nowMillis)
         }
     }
 
@@ -289,6 +305,7 @@ data class AlarmItem(
 
 sealed class Recurrence {
     data object Daily : Recurrence()
+    data class Once(val epochDay: Long) : Recurrence()
     data class Weekly(val days: Set<Int>) : Recurrence() {
         init { require(days.isNotEmpty() && days.all { it in 1..7 }) }
     }
@@ -300,6 +317,11 @@ sealed class Recurrence {
     }
 
     fun nextOccurrenceTime(hour: Int, minute: Int, nowMillis: Long): Long {
+        if (this is Once) {
+            val candidate = LocalDate.ofEpochDay(epochDay).atTime(hour, minute)
+                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            return if (candidate > nowMillis) candidate else Long.MAX_VALUE
+        }
         val calendar = Calendar.getInstance().apply {
             timeInMillis = nowMillis
             set(Calendar.HOUR_OF_DAY, hour)
@@ -311,6 +333,7 @@ sealed class Recurrence {
             if (it == Calendar.SUNDAY) 7 else it - 1
         }
         val daysToAdd = when (this) {
+            is Once -> error("Handled above")
             Daily -> if (calendar.timeInMillis <= nowMillis) 1 else 0
             is Weekly -> (0..7).first { offset ->
                 val day = (today - 1 + offset) % 7 + 1
@@ -330,6 +353,7 @@ sealed class Recurrence {
 
     fun toJson(): JSONObject = JSONObject().apply {
         when (this@Recurrence) {
+            is Once -> { put("type", "once"); put("epochDay", epochDay) }
             Daily        -> put("type", "daily")
             is Weekly    -> { put("type", "weekly"); put("days", days.sorted().joinToString(",")) }
             is EveryDays -> {
@@ -341,6 +365,7 @@ sealed class Recurrence {
     }
 
     fun summary(): String = when (this) {
+        is Once -> "Once · ${LocalDate.ofEpochDay(epochDay)}"
         Daily        -> "Every day"
         is Weekly    -> if (days.size == 7) "Every day"
                         else days.sorted().joinToString(", ") { DAY_LABELS[it - 1] }
@@ -353,6 +378,7 @@ sealed class Recurrence {
         fun fromJson(json: JSONObject?): Recurrence {
             if (json == null) return Daily
             return when (json.optString("type", "daily")) {
+                "once" -> Once(json.optLong("epochDay", LocalDate.now().toEpochDay()))
                 "weekly" -> {
                     val days = json.optString("days")
                         .split(",").mapNotNull { it.toIntOrNull() }

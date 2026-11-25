@@ -2,6 +2,28 @@
 
 [Back to the project](../README.md)
 
+## Calendar and automatic lamp actions
+
+In the routine editor, select Daily, Weekly (choose the weekdays), One date
+(native calendar picker), or Every N days. For **One date**, choose the wake-up
+date: Focus and Bedtime times later than the wake-up time belong to the previous
+day. Passed events are not replayed; expired one-off routines have no future
+events. Weekly and interval rules keep their existing per-event day semantics.
+This is local scheduling; it does not connect to a Google Calendar account.
+
+Each event can leave the lamp unchanged, turn it on, or turn it off, using the
+clock's configured colour. Disabled or skipped events do not change the lamp.
+Actions execute on the powered clock after synchronization even if the event's
+sound is phone-only. Snooze does not repeat lamp actions. Simultaneous conflicting
+actions from multiple routines should be avoided; the last processed action wins.
+Update both the Android app and ESP32 firmware to use dated routines and lamp
+actions: earlier firmware does not understand the new one-off recurrence rule.
+
+Home has a lamp switch; it is available once the clock is connected and its
+state is received. In Clock settings, choose a colour from the palette (or the
+accessible hue/saturation sliders), adjust intensity, then Apply colour. Presets
+remain available. Sending colour does not itself turn the lamp on.
+
 ## One routine, two or three events
 
 A Clockinator routine can contain these events:

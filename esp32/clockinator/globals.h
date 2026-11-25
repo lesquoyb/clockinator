@@ -63,12 +63,14 @@ struct RingtoneSlot {
     bool ringOnDevice = true;
     bool ringOnPhone  = true;   // informational only on ESP side
     bool enabled      = true;
+    int lightAction = -1;
+    long epochDay = -1;
 };
 
 /* -------------------------------------------------------------------------
  * Recurrence
  * -------------------------------------------------------------------------*/
-enum RecurrenceType { REC_DAILY, REC_WEEKLY, REC_INTERVAL };
+enum RecurrenceType { REC_DAILY, REC_WEEKLY, REC_INTERVAL, REC_ONCE };
 
 struct Recurrence {
     RecurrenceType type     = REC_DAILY;

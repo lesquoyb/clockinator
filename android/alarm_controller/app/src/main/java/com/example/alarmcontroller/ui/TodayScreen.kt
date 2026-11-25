@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -26,7 +28,7 @@ fun RingtoneType.displayLabel(): String = when (this) {
 @Composable
 fun TodayScreen(alarms: List<AlarmItem>, connected: Boolean, pendingSync: Boolean,
     onCreate: () -> Unit, onOpenClock: () -> Unit, onEdit: (AlarmItem) -> Unit,
-    onSkip: (UpcomingEvent) -> Unit) {
+    onSkip: (UpcomingEvent) -> Unit, lightOn: Boolean? = null, onLightChange: (Boolean) -> Unit = {}) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(30_000) } }
     val events = upcomingEvents(alarms, now)
@@ -35,13 +37,26 @@ fun TodayScreen(alarms: List<AlarmItem>, connected: Boolean, pendingSync: Boolea
     val dateFormat = SimpleDateFormat("EEE d MMM", Locale.getDefault())
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Lamp", style = MaterialTheme.typography.titleMedium)
+                    Text(when { !connected -> "Connect the clock to control the lamp"
+                        lightOn == null -> "Waiting for clock state"
+                        lightOn -> "On" else -> "Off" }, style = MaterialTheme.typography.bodyMedium)
+                }
+                Switch(checked = lightOn == true, onCheckedChange = onLightChange,
+                    enabled = connected && lightOn != null,
+                    modifier = Modifier.semantics { contentDescription = "Clock lamp" })
+            }
+        }
         if (events.isEmpty()) {
             item {
                 Card(shape = RoundedCornerShape(24.dp)) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("No upcoming routine", style = MaterialTheme.typography.headlineSmall)
                         Text(if (alarms.isEmpty()) "Create a routine to set your Focus, Bedtime and Wake-up times."
-                            else "Your routines are paused. Open Routines to turn one on.")
+                            else "No future events. Check the dates or enable a routine in Routines.")
                         Button(onClick = onCreate) { Text("Create a routine") }
                     }
                 }

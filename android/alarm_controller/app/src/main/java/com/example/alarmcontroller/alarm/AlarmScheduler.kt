@@ -90,8 +90,9 @@ class AlarmScheduler(private val context: Context) {
             return
         }
 
-        val triggerTime = computeNextTriggerTime(slot.hour, slot.minute, alarm.recurrence)
+        val triggerTime = computeNextTriggerTime(slot.hour, slot.minute, alarm.recurrenceFor(type))
 
+        if (triggerTime == Long.MAX_VALUE) { cancelSlot(alarm.id, type); return }
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = AlarmReceiver.ACTION_ALARM_TRIGGER
             putExtra(EXTRA_ALARM_ID, alarm.id)
