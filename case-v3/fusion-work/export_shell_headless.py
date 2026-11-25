@@ -76,7 +76,7 @@ def verify_shell(shell):
     for z in (-84.5, -71.5):
         assert shell.isInside(cq.Vector(54.2 - 4.8, design.BOTTOM + 3, z), 1e-6), 'Missing amplifier flared foot'
         hole = Geometry.cylinder(54.2, design.BOTTOM - .1, z,
-                                 54.2, top + .1, z, 1.19)[0]
+                                 54.2, design.AMP_SUPPORT_TOP + .1, z, 1.19)[0]
         assert hole.intersect(shell).Volume() < 1e-6, 'Amplifier bore blocked'
         pocket = Geometry.box(51.85, 56.55, design.BOTTOM - .1,
                               design.BOTTOM + 1.75, z - 2.35, z + 2.35)[0]

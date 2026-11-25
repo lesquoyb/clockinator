@@ -1,0 +1,44 @@
+{
+  "prototype_only": true,
+  "nominal_side_clearance_mm": 0.3,
+  "stop_travel_mm": 3.3,
+  "travel_checks": [
+    {
+      "travel_mm": 0,
+      "intersection_mm3": [
+        0,
+        0
+      ]
+    },
+    {
+      "travel_mm": 0.8,
+      "intersection_mm3": [
+        0,
+        0
+      ]
+    },
+    {
+      "travel_mm": 1.6,
+      "intersection_mm3": [
+        0,
+        0
+      ]
+    },
+    {
+      "travel_mm": 2.4,
+      "intersection_mm3": [
+        0,
+        0
+      ]
+    },
+    {
+      "travel_mm": 3.2,
+      "intersection_mm3": [
+        0,
+        0
+      ]
+    }
+  ],
+  "stem_fit": "unchanged; physical calibration required",
+  "corner_press": "physical test required; no force/elastic simulation"
+}

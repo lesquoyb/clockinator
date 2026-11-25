@@ -12,10 +12,11 @@ WALL = 2.4
 SIDE_FILLET = 2.5
 DISPLAY_X = 2.5
 ESP_X = -36.0
-ESP_Y = -16.5
+ESP_Y = -14.5  # Raised 2 mm for readily available M3 x 30 screws.
 # PCB half-length 26 mm + rear wall 2.4 mm + .9 mm clearance.
 ESP_CENTER_FROM_REAR = 29.3
 ESP_SUPPORT_TOP = ESP_Y - 1.65
+AMP_SUPPORT_TOP = -18.15  # Independent of the ESP32 mounting height.
 
 
 def split_enclosure(outer, geometry):
@@ -76,7 +77,7 @@ def add_shell_features(shell, outer, geometry):
             boolean(shell, cylinder(x, y_bot - 1, z, x, esp_y, z, 1.7), cut)
             boolean(shell, box(x - 3.3, x + 3.3, y_bot - 1, y_bot + 3.2, z - 3.3, z + 3.3), cut)
     # MAX98357A: two M2 posts, nuts inserted directly from underneath.
-    amp_top = ESP_SUPPORT_TOP
+    amp_top = AMP_SUPPORT_TOP
     for z in (-84.5, -71.5):
         x = 54.2
         post = cylinder(x, floor - .2, z, x, amp_top, z, 3.6)

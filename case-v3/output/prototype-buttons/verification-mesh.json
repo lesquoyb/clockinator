@@ -1,0 +1,52 @@
+{
+  "key-light.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "size_mm": [
+      28.59999895,
+      26.600000858,
+      9.700000286
+    ],
+    "triangles": 884
+  },
+  "key-snooze.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "size_mm": [
+      42.600002288,
+      26.600000858,
+      9.700000286
+    ],
+    "triangles": 812
+  },
+  "key-stop.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "size_mm": [
+      32.599999904,
+      26.600000858,
+      9.700000286
+    ],
+    "triangles": 780
+  },
+  "lid.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "size_mm": [
+      130.0,
+      116.453990936,
+      32.999999523
+    ],
+    "triangles": 1462
+  },
+  "switch-plate.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "size_mm": [
+      120.799999238,
+      40.999999046,
+      11.877980232
+    ],
+    "triangles": 640
+  }
+}

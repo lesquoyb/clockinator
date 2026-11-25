@@ -1,5 +1,15 @@
 # v3 exports
 
+## ESP32 raised for M3 x 30 screws
+
+The four ESP32 support tops are raised 2 mm, from Y = -18.15 mm to
+Y = -16.15 mm. The board reference and the 9.6 x 4.9 mm USB-C opening move
+up by the same amount. The amplifier supports remain at Y = -18.15 mm.
+Use M3 x 30 screws for the ESP32; check engagement and protrusion with the
+actual PCB and nuts. Shell STL, assembly STEP and native Fusion archive
+include this revision. Earlier support-height descriptions below describe
+the previous revision. The separate button trial exports are unchanged.
+
 ## Open light exit
 
 The downward light exit is 52 × 10.6 mm, extended 1.5 mm toward the visor tip to open the path toward the lower part of the display. The LED baffle remains in place, and

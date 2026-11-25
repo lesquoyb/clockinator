@@ -1,7 +1,7 @@
 {
   "valid": true,
   "solids": 1,
-  "volume_mm3": 108507.69082543247,
+  "volume_mm3": 108692.5355894979,
   "print_feedback_revision": true,
   "esp32_bottom_entry_nuts": 4,
   "esp32_side_entry_nuts": 0,
@@ -26,8 +26,8 @@
   "display_board_center_x_mm": 2.5,
   "speaker_standoffs": false,
   "speaker_head_recess_depth_mm": 0.8,
-  "esp32_support_top_mm": -18.15,
-  "support_tops": "four complete coplanar annuli",
+  "esp32_support_top_mm": -16.15,
+  "support_tops": "four annuli checked at 12 angles",
   "pcb_rear_clearance_mm": 0.9000000000000008,
   "usb_opening_mm": [
     9.6,
@@ -37,9 +37,13 @@
   "esp32_reference_solids_checked": 142,
   "esp32_collisions": [],
   "cadquery_version": "2.7.0",
-  "stl_triangles": 63648,
+  "stl_triangles": 2340,
   "stl_watertight": true,
-  "stl_volume_mm3": 108500.1978010331,
+  "stl_volume_mm3": 107076.29922933166,
   "print_min_z_mm": -0.0,
-  "step_solids": 6
+  "step_solids": 6,
+  "esp32_raise_mm": 2,
+  "amp_support_top_mm": -18.15,
+  "esp32_screws": "M3 x 30",
+  "usb_opening_raised_mm": 2
 }

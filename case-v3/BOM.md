@@ -23,14 +23,29 @@ What to buy and what to print for the smooth enclosure. No prices. Screw lengths
 | ---: | --- | --- |
 | 4 | M3 x 25 screw | Lid + switch plate + shell (one screw per point) |
 | 4 | M3 nut | Under the switch-plate brackets, slid in from the side |
-| 4 | M3 x 25 screw | ESP32: 21.23 mm from the support top to the nut seat, leaving 3.77 mm for the PCB and nut |
+| 4 | ESP32 screws: length pending correction | Current +2 mm supports do NOT accommodate M3 x 30 without protrusion for a 1.6 mm PCB. Maximum flush length is 26.43 mm + actual PCB thickness; further support height adjustment is needed for 30 mm screws |
 | 4 | M3 nut | ESP32: all 4 inserted from underneath |
 | 4 | M3 x 8 screw (provisional) | Speaker: enters from outside the rear wall, through the speaker's plastic tab; recheck length with the standoffs removed |
 | 4 | M3 nut | Speaker, on the far side of the tab, inside the speaker's own space |
-| 2 | M2 x 26 screw | MAX98357A: 22.63 mm from the support top to the nut seat. With a 1 mm PCB and a nut up to 2 mm thick, 26 mm passes through the full nut. Cut a longer screw to length if needed |
-| 2 | M2 nut | MAX98357A, inserted from underneath |
+| 2 | M2 x 25 screw (candidate; measure PCB/nut) | MAX98357A: maximum flush length is 24.43 mm + actual PCB thickness. With a 1 mm PCB, M2 x 26 protrudes 0.57 mm; M2 x 25 is recessed 0.43 mm. Confirm sufficient nut engagement |
+| 2 | M2 nut | MAX98357A, inserted from underneath; actual thickness must not exceed the 1.8 mm pocket depth |
 
 Total: **12 M3 nuts** (4 switch plate + 4 ESP32 + 4 speaker) and **2 M2 nuts**. Keep a few spare screws and nuts. Use cylindrical (ISO 4762) or pan heads; M3 heads at most 5.5 mm across.
+
+ESP32 length calculation: the 23.23 mm dimension ends at the inner ceiling of
+the underside nut pocket, not at the enclosure underside. The pocket is another
+3.2 mm deep. Add the actual PCB thickness to obtain the under-head length that
+reaches the outside bottom plane: 26.43 mm + PCB thickness. Before the 2 mm
+raise this was 24.43 mm + PCB thickness. A screw can engage the nut before it
+reaches that plane; full thread engagement depends on the actual nut thickness
+and position. The model's 1.65 mm board placement offset is not a measured PCB
+thickness. Washers, if used, add to the required screw length.
+
+Neither nuts nor screw tips may project below the enclosure. Previous
+recommendations of ESP32 M3 x 30 with only a 2 mm raise and amplifier M2 x 26
+did not satisfy this constraint. Measure PCB and nut thickness before fixing
+the final heights. Nuts must fit entirely within their pockets (ESP32: 3.2 mm;
+amplifier: 1.8 mm). This correction changes documentation only, not geometry.
 
 ## Other
 
