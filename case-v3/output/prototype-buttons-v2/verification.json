@@ -1,0 +1,1143 @@
+{
+  "prototype_only": true,
+  "revision": 2,
+  "nominal_side_clearance_mm": 0.3,
+  "upper_aperture_side_clearance_mm": 0.5,
+  "lead_in_y_mm": [
+    16.2,
+    18.3
+  ],
+  "guide_skirt_height_mm": 3.8,
+  "stop_travel_mm": 3.3,
+  "travel_checks": [
+    {
+      "key": "key-light",
+      "travel_mm": 0,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.8,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.4,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.8,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.4,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.8,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.4,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "intersection_mm3": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "tilted_checks": [
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 2.593162120554192
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 2.593162120554128
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 1.436454486917725
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 1.436454486917884
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 5.575927228209784
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 5.575927228209686
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 5.575927228209771
+    },
+    {
+      "key": "key-light",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 5.575927228209655
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 2.5931621205541955
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 2.5931621205541364
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 2.3119056337643222
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 2.3119056337640904
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 7.412911616437633
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 7.412911616437451
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 7.412911616437566
+    },
+    {
+      "key": "key-stop",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 7.412911616437405
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 0.4,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 1.6,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 2.6,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 0
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        0
+      ],
+      "lid_intersection_mm3": 0.008741443976409172,
+      "plate_stop_intersection_mm3": 2.5931621205542044
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        0
+      ],
+      "lid_intersection_mm3": 0.008741443976411096,
+      "plate_stop_intersection_mm3": 2.5931621205541577
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        0,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 9.089651510312343
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        0,
+        -1
+      ],
+      "lid_intersection_mm3": 0.07028917974859888,
+      "plate_stop_intersection_mm3": 9.089651510312025
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 13.824452237629023
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        1
+      ],
+      "lid_intersection_mm3": 0,
+      "plate_stop_intersection_mm3": 13.824452237629384
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        1,
+        -1
+      ],
+      "lid_intersection_mm3": 0.02867857590761234,
+      "plate_stop_intersection_mm3": 13.824452237629338
+    },
+    {
+      "key": "key-snooze",
+      "travel_mm": 3.2,
+      "angles_deg": [
+        -1,
+        -1
+      ],
+      "lid_intersection_mm3": 0.028678575907697262,
+      "plate_stop_intersection_mm3": 13.824452237628794
+    }
+  ],
+  "stem_fit": "unchanged; physical calibration required",
+  "corner_press": "96 tilted poses checked; physical friction and deformation test still required"
+}

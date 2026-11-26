@@ -1,0 +1,61 @@
+{
+  "key-light.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "triangles": 1324,
+    "size_mm": [
+      28.59999895,
+      26.600000858,
+      9.700000286
+    ]
+  },
+  "key-snooze.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "triangles": 1004,
+    "size_mm": [
+      42.600002288,
+      26.600000858,
+      9.700000286
+    ]
+  },
+  "key-stop.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "triangles": 1004,
+    "size_mm": [
+      32.599999904,
+      26.600000858,
+      9.700000286
+    ]
+  },
+  "lid.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "triangles": 7264,
+    "size_mm": [
+      130.0,
+      116.453990936,
+      32.999999523
+    ]
+  },
+  "switch-plate.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "triangles": 1080,
+    "size_mm": [
+      120.799999238,
+      40.999999046,
+      11.877980232
+    ]
+  },
+  "tilted_summary": {
+    "total": 96,
+    "free_poses_without_lid_collision": 72,
+    "poses_intercepted_by_plate": 24,
+    "angles_deg": [
+      -1,
+      1
+    ]
+  }
+}
